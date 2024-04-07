@@ -25,6 +25,7 @@ sys.path.insert(0, str(mmdet_root))
 from utils_mmdet import vis_bbox, VOC_BBOX_LABEL_NAMES, COCO_BBOX_LABEL_NAMES, voc2coco, get_det, is_success, get_iou
 from utils_mmdet import model_train
 
+target_label_set = set([0, 2, 3, 9, 11])
 
 def PM_tensor_weight_balancing(im, adv, target, w, ensemble, eps, n_iters, alpha, dataset='voc', weight_balancing=False):
     """perturbation machine, balance the weights of different surrogate models
@@ -142,6 +143,10 @@ def save_det_to_fig(im_np, adv_np, LOSS, target_clean, all_models, im_id, im_idx
     ax[row,0].set_title('clean image')
     for model_idx, model in enumerate(all_models):
         det_adv = model.det(im_np)
+
+        indices_to_remove = np.any(det_adv[:, 4:5] == np.array(list(target_label_set)), axis=1)
+        det_adv = det_adv[indices_to_remove]
+
         bboxes, labels, scores = det_adv[:,:4], det_adv[:,4], det_adv[:,5]
         vis_bbox(im_np, bboxes, labels, scores, ax=ax[row,model_idx+1], dataset=dataset)
         ax[row,model_idx+1].set_title(model.model_name)
@@ -152,6 +157,10 @@ def save_det_to_fig(im_np, adv_np, LOSS, target_clean, all_models, im_id, im_idx
     success_list = [] # 1 for success, 0 for fail for all models
     for model_idx, model in enumerate(all_models):
         det_adv = model.det(adv_np)
+
+        indices_to_remove = np.any(det_adv[:, 4:5] == np.array(list(target_label_set)), axis=1)
+        det_adv = det_adv[indices_to_remove]
+
         bboxes, labels, scores = det_adv[:,:4], det_adv[:,4], det_adv[:,5]
         vis_bbox(adv_np, bboxes, labels, scores, ax=ax[row,model_idx+1], dataset=dataset)
         ax[row,model_idx+1].set_title(model.model_name)
@@ -179,10 +188,10 @@ def main():
     parser.add_argument("--iters", type=int, default=20, help="number of inner iterations: 5,6,10,20...")
     # parser.add_argument("--gpu", type=int, default=0, help="GPU ID: 0,1")
     parser.add_argument("--root", type=str, default='result', help="the folder name of result")
-    parser.add_argument("--victim", type=str, default='RetinaNet', help="victim model")
+    parser.add_argument("--victim", type=str, default='DETR', help="victim model")
     parser.add_argument("--x", type=int, default=3, help="times alpha by x")
-    parser.add_argument("--n_wb", type=int, default=2, help="number of models in the ensemble")
-    parser.add_argument("--surrogate", type=str, default='Faster R-CNN', help="surrogate model when n_wb=1")
+    parser.add_argument("--n_wb", type=int, default=4, help="number of models in the ensemble")
+    parser.add_argument("--surrogate", type=str, default='DETR', help="surrogate model when n_wb=1")
     # parser.add_argument("-untargeted", action='store_true', help="run untargeted attack")
     # parser.add_argument("--loss_name", type=str, default='cw', help="the name of the loss")
     parser.add_argument("--lr", type=float, default=1e-2, help="learning rate of w")
@@ -205,7 +214,7 @@ def main():
 
     # load surrogate models
     ensemble = []
-    models_all = ['Faster R-CNN', 'YOLOv3', 'FCOS', 'Grid R-CNN', 'SSD']
+    models_all = ['Faster R-CNN', 'YOLOv3', 'YOLOX', 'Grid R-CNN', 'SSD']
     model_list = models_all[:n_wb]
     if n_wb == 1:
         model_list = [args.surrogate]
@@ -271,10 +280,17 @@ def main():
         
         # get detection on clean images and determine target class
         det = model_victim.det(im_np)
+
+        indices_to_remove = np.any(det[:, 4:5] == np.array(list(target_label_set)), axis=1)
+        det = det[indices_to_remove]
+
         bboxes, labels, scores = det[:,:4], det[:,4], det[:,5]
         print(f"n_objects: {len(det)}")
         n_obj_list.append(len(det))
         if len(det) == 0: # if nothing is detected, skip this image
+            adv_path = adv_root / f"{im_id}.jpg"
+            adv_png = Image.fromarray(adv_np.astype(np.uint8))
+            adv_png.save(adv_path)
             continue
         else:
             dict_k_valid_id_v_success_list[im_id] = []
@@ -286,7 +302,8 @@ def main():
 
         # randomly select a target
         select_n = 1 # for each victim object, randomly select 5 target objects
-        target_pool = list(set(range(n_labels)) - all_categories)
+        # target_pool = list(set(range(n_labels)) - all_categories)
+        target_pool = list(target_label_set - set([victim_class]))
         target_pool = np.random.permutation(target_pool)[:select_n]
 
         # for target_class in target_pool:
@@ -458,6 +475,10 @@ def main():
         im = im_np
         im_temp = im if model_victim.rgb else im[:,:,::-1]
         det = get_det(model_victim.model, victim_name, im_temp, dataset)
+
+        indices_to_remove = np.any(det[:, 4:5] == np.array(list(target_label_set)), axis=1)
+        det = det[indices_to_remove]
+
         bboxes, labels, scores = det[:,:4], det[:,4], det[:,5]
         vis_bbox(im, bboxes, labels, scores, ax=ax[1], dataset=dataset)
         ax[1].set_title(f"clean image")
@@ -465,6 +486,10 @@ def main():
         adv = adv_np
         im_temp = adv if model_victim.rgb else adv[:,:,::-1]
         det = get_det(model_victim.model, victim_name, im_temp, dataset)
+
+        indices_to_remove = np.any(det[:, 4:5] == np.array(list(target_label_set)), axis=1)
+        det = det[indices_to_remove]
+
         bboxes, labels, scores = det[:,:4], det[:,4], det[:,5]
         vis_bbox(adv, bboxes, labels, scores, ax=ax[2], dataset=dataset)
         ax[2].set_title(f'adv image @ iter {n_query} \n {label_names[victim_class]} to {label_names[target_class]}')
