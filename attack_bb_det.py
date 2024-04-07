@@ -12,6 +12,8 @@ import random
 import pdb
 
 import numpy as np
+import os
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 import torch
 from PIL import Image
 from matplotlib import pyplot as plt
@@ -185,7 +187,7 @@ def main():
     # parser.add_argument("--loss_name", type=str, default='cw', help="the name of the loss")
     parser.add_argument("--lr", type=float, default=1e-2, help="learning rate of w")
     parser.add_argument("--iterw", type=int, default=10, help="iterations of updating w")
-    parser.add_argument("--dataset", type=str, default='voc', help="model dataset 'voc' or 'coco'. This will change the output range of detectors.")
+    parser.add_argument("--dataset", type=str, default='coco', help="model dataset 'voc' or 'coco'. This will change the output range of detectors.")
     parser.add_argument("-single", action='store_true', help="only care about one obj")
     parser.add_argument("-no_balancing", action='store_true', help="do not balance weights at beginning")
     args = parser.parse_args()
@@ -260,7 +262,10 @@ def main():
     dict_k_valid_id_v_success_list = {} # lists of success for all mdoels for valid im_ids
     n_obj_list = []
 
+    test_image_ids = JSON.load(open(f"data/CVPR_Adversarial/output.json"))
     for im_idx, im_id in tqdm(enumerate(test_image_ids[:500])):
+    # for im_idx, im_id in [(1, "000004")]:
+        im_root = Path("data/CVPR_Adversarial")
         im_path = im_root / f"{im_id}.jpg"
         im_np = np.array(Image.open(im_path).convert('RGB'))
         
@@ -330,7 +335,8 @@ def main():
         dict_k_valid_id_v_success_list[im_id].append(success_list)
 
         # save adv in folder
-        adv_path = adv_root / f"{im_id}_iter{n_query:02d}.png"
+        # adv_path = adv_root / f"{im_id}_iter{n_query:02d}.png"
+        adv_path = adv_root / f"{im_id}.jpg"
         adv_png = Image.fromarray(adv_np.astype(np.uint8))
         adv_png.save(adv_path)
 
@@ -364,7 +370,8 @@ def main():
                 print(f"iter: {n_query}, {idx_w} +, loss_bb: {loss_bb_plus}")
 
                 # save adv in folder
-                adv_path = adv_root / f"{im_id}_iter{n_query:02d}.png"
+                # adv_path = adv_root / f"{im_id}_iter{n_query:02d}.png"
+                adv_path = adv_root / f"{im_id}.jpg"
                 adv_png = Image.fromarray(adv_np_plus.astype(np.uint8))
                 adv_png.save(adv_path)
 
@@ -392,7 +399,8 @@ def main():
                 print(f"iter: {n_query}, {idx_w} -, loss_bb: {loss_bb_minus}")
 
                 # save adv in folder
-                adv_path = adv_root / f"{im_id}_iter{n_query:02d}.png"
+                # adv_path = adv_root / f"{im_id}_iter{n_query:02d}.png"
+                adv_path = adv_root / f"{im_id}.jpg"
                 adv_png = Image.fromarray(adv_np_minus.astype(np.uint8))
                 adv_png.save(adv_path)
 
