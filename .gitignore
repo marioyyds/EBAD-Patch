@@ -1,0 +1,6 @@
+data/
+results_detection_voc/
+results_voc/
+__pycache__/
+mmdetection/
+nohup.out
