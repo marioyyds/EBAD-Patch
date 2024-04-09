@@ -102,7 +102,17 @@ model_info = {
         'config_file': 'configs/atss/atss_r50_fpn_1x_coco.py',
         'checkpoint_file': 'checkpoints/atss_r50_fpn_1x_coco_20200209-985f7bd0.pth',
         'download_link': 'https://download.openmmlab.com/mmdetection/v2.0/atss/atss_r50_fpn_1x_coco/atss_r50_fpn_1x_coco_20200209-985f7bd0.pth'
-    }
+    },
+    'TOOD': {
+        'config_file': 'configs/tood/tood_r101_fpn_dconv_c3-c5_mstrain_2x_coco.py',
+        'checkpoint_file': 'checkpoints/tood_r101_fpn_dconv_c3-c5_mstrain_2x_coco_20211210_213728-4a824142.pth',
+        'download_link': 'https://download.openmmlab.com/mmdetection/v2.0/tood/tood_r101_fpn_dconv_c3-c5_mstrain_2x_coco/tood_r101_fpn_dconv_c3-c5_mstrain_2x_coco_20211210_213728-4a824142.pth'
+    },
+    # 'ViTDet': {
+    #     'config_file': 'configs/atss/atss_r50_fpn_1x_coco.py',
+    #     'checkpoint_file': 'checkpoints/atss_r50_fpn_1x_coco_20200209-985f7bd0.pth',
+    #     'download_link': 'https://download.openmmlab.com/mmdetection/v2.0/atss/atss_r50_fpn_1x_coco/atss_r50_fpn_1x_coco_20200209-985f7bd0.pth'
+    # }
 }
 
 
