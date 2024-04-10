@@ -15,7 +15,7 @@ import datetime
 
 import numpy as np
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 import torch
 from PIL import Image
 from matplotlib import pyplot as plt
@@ -216,7 +216,7 @@ def main():
 
     # load surrogate models
     ensemble = []
-    models_all = ['Faster R-CNN', 'YOLOv3', 'YOLOX', 'Grid R-CNN', 'SSD']
+    models_all = ['Faster R-CNN', 'YOLOv3', 'FCOS', 'Grid R-CNN', 'SSD']
     model_list = models_all[:n_wb]
     if n_wb == 1:
         model_list = [args.surrogate]
@@ -293,7 +293,7 @@ def main():
         n_obj_list.append(len(det))
         if len(det) == 0: # if nothing is detected, skip this image
             adv_path = adv_root / f"{im_id}.jpg"
-            adv_png = Image.fromarray(adv_np.astype(np.uint8))
+            adv_png = Image.fromarray(im_np.astype(np.uint8))
             adv_png.save(adv_path)
             continue
         else:
