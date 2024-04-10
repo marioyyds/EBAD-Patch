@@ -31,11 +31,11 @@ target_label_set = set([0, 2, 3, 9, 11])
 
 
 def generate_mask(image_shape, bounding_boxes):
-    mask = np.zeros(image_shape, dtype=np.uint8)
+    mask = np.ones(image_shape, dtype=np.uint8)
+
     for box in bounding_boxes:
         x1, y1, x2, y2 = box
-        # mask[y1:y2, x1:x2] = 1
-        mask[int(y1):int(y2), int(x1):int(x2)] = 1
+        mask[int(y1):int(y2), int(x1):int(x2)] = 0
     return mask
 
 def PM_tensor_weight_balancing(im, adv, target, w, ensemble, eps, n_iters, alpha, dataset='voc', weight_balancing=False):
