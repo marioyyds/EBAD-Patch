@@ -89,8 +89,9 @@ def PM_tensor_weight_balancing(im, adv, target, w, ensemble, eps, n_iters, alpha
             LOSS['ens'].append(loss_ens.item())
 
             # add mask to attack only specify objection area/range
-            mask = generate_mask(pert.shape[-2:], bboxes_tgt)
-            pert = pert.masked_fill(torch.from_numpy(mask), 0)
+            # mask = torch.from_numpy(generate_mask(pert.shape[-2:], bboxes_tgt)).to("cuda")
+            mask = torch.from_numpy(generate_mask(pert.shape[-2:], bboxes_tgt)).to(pert.device)
+            pert = pert.masked_fill(mask, 0)
 
             adv = (im + pert).clip(0, 255)
             adv_list.append(adv)
