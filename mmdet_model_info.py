@@ -3,7 +3,7 @@
 
 model_info = {
     'Faster R-CNN': {
-        'config_file': 'configs/faster_rcnn/faster_rcnn_r50_fpn_1x_coco.py',
+        'config_file': 'configs/faster_rcnn/faster-rcnn_r50_fpn_1x_coco.py',
         'checkpoint_file': 'checkpoints/faster_rcnn_r50_fpn_1x_coco_20200130-047c8118.pth',
         'download_link': 'http://download.openmmlab.com/mmdetection/v2.0/faster_rcnn/faster_rcnn_r50_fpn_1x_coco/faster_rcnn_r50_fpn_1x_coco_20200130-047c8118.pth'
     },
@@ -19,7 +19,7 @@ model_info = {
         
     },
     'YOLOv3': {
-        'config_file': 'configs/yolo/yolov3_d53_mstrain-416_273e_coco.py',
+        'config_file': 'configs/yolo/yolov3_d53_8xb8-ms-416-273e_coco.py',
         'checkpoint_file': 'checkpoints/yolov3_d53_mstrain-416_273e_coco-2b60fcd9.pth',
         'download_link': 'http://download.openmmlab.com/mmdetection/v2.0/yolo/yolov3_d53_mstrain-416_273e_coco/yolov3_d53_mstrain-416_273e_coco-2b60fcd9.pth'
     },
@@ -49,9 +49,9 @@ model_info = {
         'download_link': 'http://download.openmmlab.com/mmdetection/v2.0/free_anchor/retinanet_free_anchor_r50_fpn_1x_coco/retinanet_free_anchor_r50_fpn_1x_coco_20200130-0f67375f.pth'
     },
     'DETR': {
-        'config_file': 'configs/detr/detr_r50_8x2_150e_coco.py',
-        'checkpoint_file': 'checkpoints/detr_r50_8x2_150e_coco_20201130_194835-2c4b8974.pth',
-        'download_link': 'https://download.openmmlab.com/mmdetection/v2.0/detr/detr_r50_8x2_150e_coco/detr_r50_8x2_150e_coco_20201130_194835-2c4b8974.pth'
+        'config_file': 'configs/detr/detr_r50_8xb2-150e_coco.py',
+        'checkpoint_file': 'checkpoints/detr_r50_8xb2-150e_coco_20221023_153551-436d03e8.pth',
+        'download_link': 'https://download.openmmlab.com/mmdetection/v3.0/detr/detr_r50_8xb2-150e_coco/detr_r50_8xb2-150e_coco_20221023_153551-436d03e8.pth'
     },
     'Deformable DETR': {
         'config_file': 'configs/deformable_detr/deformable_detr_r50_16x2_50e_coco.py',
@@ -69,7 +69,7 @@ model_info = {
         'download_link': 'https://download.openmmlab.com/mmdetection/v2.0/reppoints/reppoints_moment_r50_fpn_1x_coco/reppoints_moment_r50_fpn_1x_coco_20200330-b73db8d1.pth'
     },
     'Grid R-CNN': {
-        'config_file': 'configs/grid_rcnn/grid_rcnn_r50_fpn_gn-head_2x_coco.py',
+        'config_file': 'configs/grid_rcnn/grid-rcnn_r50_fpn_gn-head_2x_coco.py',
         'checkpoint_file': 'checkpoints/grid_rcnn_r50_fpn_gn-head_2x_coco_20200130-6cca8223.pth',
         'download_link': 'https://download.openmmlab.com/mmdetection/v2.0/grid_rcnn/grid_rcnn_r50_fpn_gn-head_2x_coco/grid_rcnn_r50_fpn_gn-head_2x_coco_20200130-6cca8223.pth'
     },
@@ -89,7 +89,7 @@ model_info = {
         'download_link': 'https://download.openmmlab.com/mmdetection/v2.0/centernet/centernet_resnet18_dcnv2_140e_coco/centernet_resnet18_dcnv2_140e_coco_20210702_155131-c8cd631f.pth'
     },
     'YOLOX': {
-        'config_file': 'configs/yolox/yolox_tiny_8x8_300e_coco.py',
+        'config_file': 'configs/yolox/yolox_tiny_8xb8-300e_coco.py',
         'checkpoint_file': 'checkpoints/yolox_tiny_8x8_300e_coco_20211124_171234-b4047906.pth',
         'download_link': 'https://download.openmmlab.com/mmdetection/v2.0/yolox/yolox_tiny_8x8_300e_coco/yolox_tiny_8x8_300e_coco_20211124_171234-b4047906.pth'
     },

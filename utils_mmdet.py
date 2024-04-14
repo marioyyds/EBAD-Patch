@@ -10,12 +10,16 @@ import torch
 from torch.nn import functional as F
 from torchvision import transforms
 import mmcv
-from mmcv.runner import load_checkpoint
+import mmengine
+from mmengine.runner import load_checkpoint
 
 sys.path.insert(0, 'mmdetection/')
-from mmdet.models import build_detector
+from mmdet.apis import init_detector
 from mmdet.apis import inference_detector
+
 from mmdet_model_info import model_info
+
+from mmengine.runner import Runner
 
 
 VOC_BBOX_LABEL_NAMES = (
@@ -41,18 +45,18 @@ VOC_BBOX_LABEL_NAMES = (
     'tvmonitor')
 
 COCO_BBOX_LABEL_NAMES = (
-    'person',
+    'person',# 0
     'bicycle',
-    'car',
-    'motorcycle',
+    'car', # 2
+    'motorcycle', # 3
     'airplane',
     'bus',
     'train',
     'truck',
     'boat',
-    'traffic light',
+    'traffic light', # 9
     'fire hydrant',
-    'stop sign',
+    'stop sign', # 11
     'parking meter',
     'bench',
     'bird',
@@ -238,7 +242,7 @@ def is_to_rgb(model):
         model (~ mmdet.models.detectors): a mmdet model
     """
     to_rgb = True
-    for item in model.cfg.data.test.pipeline[1]['transforms']:
+    for item in model.cfg.test_dataloader.dataset.pipeline[1]:
         if 'to_rgb' in item:
             to_rgb = item['to_rgb']
     return to_rgb
@@ -283,9 +287,12 @@ def output2det(outputs, im, conf_thres=0.5, dataset='voc'):
         dataset (str): if use 'voc', only the labels within the voc dataset will be returned
     """
     det = []
-    for idx, items in enumerate(outputs):
-        for item in items:
-            det.append(item[:4].tolist() + [idx] + item[4:].tolist())
+    # for idx, items in enumerate(outputs):
+    # for idx, items in outputs.pred_instances:
+    #     for item in items:
+    #         det.append(item[:4].tolist() + [idx] + item[4:].tolist())
+    for it in outputs.pred_instances:
+        det.append(it.bboxes.squeeze().tolist() + it.labels.tolist() + it.scores.tolist())
     det = np.array(det)
     
     # if det is empty
@@ -306,12 +313,12 @@ def output2det(outputs, im, conf_thres=0.5, dataset='voc'):
         det = det[det[:,4] != -1]
 
     # make the value in range
-    m, n, _ = im.shape
-    for item in det:
-        item[0] = min(max(item[0],0),n)
-        item[2] = min(max(item[2],0),n)
-        item[1] = min(max(item[1],0),m)
-        item[3] = min(max(item[3],0),m)
+    # m, n, _ = im.shape
+    # for item in det:
+    #     item[0] = min(max(item[0],0),n)
+    #     item[2] = min(max(item[2],0),n)
+    #     item[1] = min(max(item[1],0),m)
+    #     item[3] = min(max(item[3],0),m)
     return det
 
 
@@ -377,25 +384,36 @@ def get_test_data(model, im):
     Returns:
         data_train (): train data format
     """
-    from mmdet.datasets import replace_ImageToTensor
-    from mmdet.datasets.pipelines import Compose
-    from mmcv.parallel import collate, scatter
+    # from mmdet.datasets import replace_ImageToTensor
+    # from mmdet.datasets.pipelines import Compose
+    from mmcv.transforms import Compose
+    from mmengine.dataset import default_collate
 
     if not is_to_rgb(model): im = im[:,:,::-1]
     cfg = model.cfg
     device = next(model.parameters()).device
     cfg = cfg.copy()
-    cfg.data.test.pipeline[0].type = 'LoadImageFromWebcam'
-    cfg.data.test.pipeline = replace_ImageToTensor(cfg.data.test.pipeline)
-    test_pipeline = Compose(cfg.data.test.pipeline)
+    cfg.test_dataloader.dataset.pipeline[0].type = 'LoadImageFromNDArray'
+    # cfg.test_dataloader.dataset.pipeline = replace_ImageToTensor(cfg.data.test.pipeline)
+    test_pipeline = Compose(cfg.test_dataloader.dataset.pipeline)
+    # transform_broadcaster = cfg.test_dataloader.dataset.pipeline[0].copy()
+    # for transform in transform_broadcaster['transforms']:
+    #     if transform['type'] == 'Resize':
+    #         transform_broadcaster['transforms'] = transform
+    # pack_track_inputs = cfg.test_dataloader.dataset.pipeline[-1].copy()
+    # test_pipeline = Compose([transform_broadcaster, pack_track_inputs])
+
+    # test_pipeline = build_test_pipeline(cfg)
     datas = []
     data = dict(img=im)
     data = test_pipeline(data)
     datas.append(data)
-    data = collate(datas, samples_per_gpu=1)
-    data['img_metas'] = [img_metas.data[0] for img_metas in data['img_metas']]
-    data['img'] = [img.data[0] for img in data['img']]
-    data = scatter(data, [device])[0]
+    data = default_collate(datas)
+    # data['inputs'] = [img_metas.data[0] for img_metas in data['inputs']]
+    # data['data_samples'] = [img.data[0] for img in data['data_samples']]
+    # data['data_samples'].to(device)
+    # data = scatter(data, [device])[0]
+    data['inputs'].to(device)
     return data
 
     
@@ -415,8 +433,8 @@ def get_train_data(model, im, pert, data, bboxes, labels):
 
     # BELOW IS TRAIN
     data_train = data.copy()
-    data_train['img_metas'] = data_train['img_metas'][0]
-    data_train['img'] = data_train['img'][0]
+    data_train['inputs'] = data_train['inputs'][0]
+    data_train['data_samples'] = data_train['data_samples'][0]
     ''' from file: datasets/pipelines/transforms.py '''
     
     if not is_to_rgb(model): im = im[:,:,::-1]
@@ -425,32 +443,34 @@ def get_train_data(model, im, pert, data, bboxes, labels):
 
     # 'type': 'Resize', 'keep_ratio': True, (1333, 800)
     ori_sizes = im.shape[:2]
-    image_sizes = data_train['img_metas'][0]['img_shape'][:2]
+    image_sizes = data_train['data_samples'].metainfo['img_shape'][:2]
     w_scale = image_sizes[1] / ori_sizes[1]
     h_scale = image_sizes[0] / ori_sizes[0]
     scale_factor = np.array([w_scale, h_scale, w_scale, h_scale], dtype=np.float32)
     gt_bboxes = bboxes * scale_factor
     gt_bboxes[:, 0::2] = np.clip(gt_bboxes[:, 0::2], 0, image_sizes[1])
     gt_bboxes[:, 1::2] = np.clip(gt_bboxes[:, 1::2], 0, image_sizes[0])
-    data_train['gt_bboxes'] = [torch.from_numpy(gt_bboxes).to(device)]
-    data_train['gt_labels'] = [torch.from_numpy(labels).to(device)]
+    data_train['data_samples'].gt_instances['bboxes'] = torch.from_numpy(gt_bboxes).to(device)
+    data_train['data_samples'].gt_instances['labels'] = torch.from_numpy(labels).to(device)
     # img = F.interpolate(img, size=image_sizes, mode='nearest')
     img = F.interpolate(img, size=image_sizes, mode='bilinear', align_corners=True)
 
     # 'type': 'Normalize', 'mean': [103.53, 116.28, 123.675], 'std': [1.0, 1.0, 1.0], 'to_rgb': False
-    img_norm_cfg = data_train['img_metas'][0]['img_norm_cfg']
-    mean = img_norm_cfg['mean']
-    std = img_norm_cfg['std']
-    transform = transforms.Normalize(mean=mean, std=std)
-    img = transform(img)
+    # img_norm_cfg = data_train['img_metas'][0]['img_norm_cfg']
+    # mean = img_norm_cfg['mean']
+    # std = img_norm_cfg['std']
+    # transform = transforms.Normalize(mean=mean, std=std)
+    # img = transform(img)
 
     # 'type': 'Pad', 'size_divisor': 32
-    pad_sizes = data_train['img_metas'][0]['pad_shape'][:2]
-    left = top = 0
-    bottom = pad_sizes[0] - image_sizes[0]
-    right = pad_sizes[1] - image_sizes[1]
-    img = F.pad(img, (left, right, top, bottom), "constant", 0)
-    data_train['img'] = img
+    # pad_sizes = data_train['img_metas'][0]['pad_shape'][:2]
+    # left = top = 0
+    # bottom = pad_sizes[0] - image_sizes[0]
+    # right = pad_sizes[1] - image_sizes[1]
+    # img = F.pad(img, (left, right, top, bottom), "constant", 0)
+    data_train['inputs'] = img
+    # data_train['inputs'] = [data_train['inputs']]
+    data_train['data_samples'] = [data_train['data_samples']]
     return data_train
 
 
@@ -462,15 +482,20 @@ def get_loss_from_dict(model_name, loss_dict):
     Returns:
         losses (~ torch.Tensor): the summation of the loss
     """
-    if model_name in ['Faster R-CNN', 'Libra R-CNN', 'GN+WS']:
-        losses = loss_dict['loss_cls'] + loss_dict['loss_bbox'] + sum(loss_dict['loss_rpn_cls']) + sum(loss_dict['loss_rpn_bbox'])
-        # losses = sum(loss_dict.values())
-    elif model_name in ['Grid R-CNN']:
-        losses = loss_dict['loss_cls'] + sum(loss_dict['loss_rpn_cls']) + sum(loss_dict['loss_rpn_bbox'])
-    elif model_name in ['YOLOv3', 'RetinaNet', 'RepPoints', 'SSD']:
-        losses = sum(sum(loss_dict[key]) for key in loss_dict)
-    else: # ['FreeAnchor', 'DETR', 'CenterNet', 'YOLOX', 'FoveaBox']
-        losses = sum(loss_dict.values())
+    # if model_name in ['Faster R-CNN', 'Libra R-CNN', 'GN+WS']:
+    #     losses = loss_dict['loss_cls'] + loss_dict['loss_bbox'] + sum(loss_dict['loss_rpn_cls']) + sum(loss_dict['loss_rpn_bbox'])
+    #     # losses = sum(loss_dict.values())
+    # elif model_name in ['Grid R-CNN']:
+    #     losses = loss_dict['loss_cls'] + sum(loss_dict['loss_rpn_cls']) + sum(loss_dict['loss_rpn_bbox'])
+    # elif model_name in ['YOLOv3', 'RetinaNet', 'RepPoints', 'SSD']:
+    #     losses = sum(sum(loss_dict[key]) for key in loss_dict)
+    # else: # ['FreeAnchor', 'DETR', 'CenterNet', 'YOLOX', 'FoveaBox']
+    #     losses = sum(loss_dict.values())
+    # losses = 0
+    # for loss_name, loss_val in loss_dict:
+    #     losses += loss_val
+    # losses = sum(loss_dict.values())
+    losses = loss_dict["loss"]
     return losses
 
 
@@ -486,8 +511,8 @@ class model_train(torch.nn.Module):
         mmdet_root = Path('mmdetection/') # root for config files
         config_file = str(mmdet_root / model_info[model_name]['config_file'])
         checkpoint_file = str(mmdet_root / model_info[model_name]['checkpoint_file'])
-        config = mmcv.Config.fromfile(config_file)
-        model_train = build_detector(config.model, test_cfg=config.get('test_cfg'))
+        config = mmengine.Config.fromfile(config_file)
+        model_train = init_detector(config)
         checkpoint = load_checkpoint(model_train, checkpoint_file, map_location=None)
         if 'CLASSES' in checkpoint.get('meta', {}):
             model_train.CLASSES = checkpoint['meta']['CLASSES']
@@ -499,6 +524,10 @@ class model_train(torch.nn.Module):
         self.device = device
         self.conf_thres = get_conf_thres(model_name)
         self.dataset = dataset
+        cfg = self.model.cfg
+
+        from mmengine.optim import build_optim_wrapper
+        self.optim = build_optim_wrapper(self.model, cfg.optim_wrapper)
 
     def forward(self, x):
         """inference model using image x
@@ -519,7 +548,21 @@ class model_train(torch.nn.Module):
         """
         data = get_test_data(self.model, x)
         data_train = get_train_data(self.model, x, pert.to(self.device), data, bboxes_tgt, labels_tgt)
-        loss_dict = self.model(return_loss=True, **data_train)
+        # loss_dict = self.model(mode="loss", **data_train)
+        # optim.load_state_dict(cfg)
+        # from mmengine.registry import MODELS
+        # data_preprocessor = MODELS.build(data_preprocessor)
+        # data_train = data_preprocessor(data)
+        # from mmdet.models import DetDataPreprocessor
+        # dataprocessor = DetDataPreprocessor()
+
+        loss_dict = self.model.train_step(data_train, optim_wrapper = self.optim)
+        # loss_dict = self.model(model = "loss", **data_train)
+        # cfg = self.model.cfg
+        # from mmengine.runner import Runner
+
+        # self.runner = Runner(self.model, train_dataloader=cf)
+
         # print(f"loss_dict: {loss_dict}")
         loss = get_loss_from_dict(self.model_name, loss_dict)
         return loss
@@ -549,10 +592,10 @@ def get_train_model(config_file, checkpoint_file, device='cuda:0'):
         device (~ str): indicates which gpu to allocate
     """
     import mmcv
-    from mmdet.models import build_detector
-    from mmcv.runner import load_checkpoint
+    from mmdet.models import init_detector
+    from mmengine.runner import load_checkpoint
     config = mmcv.Config.fromfile(config_file)
-    model_train = build_detector(config.model, test_cfg=config.get('test_cfg'))
+    model_train = init_detector(config.model, test_cfg=config.get('test_cfg'))
     map_loc = 'cpu' if device == 'cpu' else None
     checkpoint = load_checkpoint(model_train, checkpoint_file, map_location=map_loc)
     if 'CLASSES' in checkpoint.get('meta', {}):

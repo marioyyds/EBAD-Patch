@@ -13,7 +13,7 @@ import pdb
 
 import numpy as np
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 import torch
 from PIL import Image
 from matplotlib import pyplot as plt
@@ -190,8 +190,8 @@ def main():
     parser.add_argument("--root", type=str, default='result', help="the folder name of result")
     parser.add_argument("--victim", type=str, default='DETR', help="victim model")
     parser.add_argument("--x", type=int, default=3, help="times alpha by x")
-    parser.add_argument("--n_wb", type=int, default=4, help="number of models in the ensemble")
-    parser.add_argument("--surrogate", type=str, default='DETR', help="surrogate model when n_wb=1")
+    parser.add_argument("--n_wb", type=int, default=1, help="number of models in the ensemble")
+    parser.add_argument("--surrogate", type=str, default='YOLOX', help="surrogate model when n_wb=1")
     # parser.add_argument("-untargeted", action='store_true', help="run untargeted attack")
     # parser.add_argument("--loss_name", type=str, default='cw', help="the name of the loss")
     parser.add_argument("--lr", type=float, default=1e-2, help="learning rate of w")
@@ -214,7 +214,8 @@ def main():
 
     # load surrogate models
     ensemble = []
-    models_all = ['Faster R-CNN', 'YOLOv3', 'YOLOX', 'Grid R-CNN', 'SSD']
+    # models_all = ['Faster R-CNN', 'YOLOv3', 'YOLOX', 'Grid R-CNN', 'SSD']
+    models_all = ['YOLOv3', 'YOLOX', 'Grid R-CNN', 'SSD']
     model_list = models_all[:n_wb]
     if n_wb == 1:
         model_list = [args.surrogate]
@@ -281,15 +282,15 @@ def main():
         # get detection on clean images and determine target class
         det = model_victim.det(im_np)
 
-        indices_to_remove = np.any(det[:, 4:5] == np.array(list(target_label_set)), axis=1)
-        det = det[indices_to_remove]
+        # indices_to_remove = np.any(det[:, 4:5] == np.array(list(target_label_set)), axis=1)
+        # det = det[indices_to_remove]
 
         bboxes, labels, scores = det[:,:4], det[:,4], det[:,5]
         print(f"n_objects: {len(det)}")
         n_obj_list.append(len(det))
         if len(det) == 0: # if nothing is detected, skip this image
             adv_path = adv_root / f"{im_id}.jpg"
-            adv_png = Image.fromarray(adv_np.astype(np.uint8))
+            adv_png = Image.fromarray(im_np.astype(np.uint8))
             adv_png.save(adv_path)
             continue
         else:

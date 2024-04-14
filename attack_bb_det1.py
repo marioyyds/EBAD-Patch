@@ -13,7 +13,7 @@ import pdb
 
 import numpy as np
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1,2'
 import torch
 from PIL import Image
 from matplotlib import pyplot as plt
@@ -195,7 +195,7 @@ def main():
     # parser.add_argument("-untargeted", action='store_true', help="run untargeted attack")
     # parser.add_argument("--loss_name", type=str, default='cw', help="the name of the loss")
     parser.add_argument("--lr", type=float, default=1e-2, help="learning rate of w")
-    parser.add_argument("--iterw", type=int, default=1, help="iterations of updating w")
+    parser.add_argument("--iterw", type=int, default=5, help="iterations of updating w")
     parser.add_argument("--dataset", type=str, default='coco', help="model dataset 'voc' or 'coco'. This will change the output range of detectors.")
     parser.add_argument("-single", action='store_true', help="only care about one obj")
     parser.add_argument("-no_balancing", action='store_true', help="do not balance weights at beginning")
@@ -215,7 +215,7 @@ def main():
     # load surrogate models
     ensemble = []
     # models_all = ['Faster R-CNN', 'YOLOv3', 'YOLOX', 'Grid R-CNN', 'SSD']
-    models_all = ['DETR']
+    models_all = ['Deformable DETR']
     model_list = models_all[:n_wb]
     if n_wb == 1:
         model_list = [args.surrogate]
