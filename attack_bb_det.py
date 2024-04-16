@@ -11,9 +11,11 @@ import json as JSON
 import random
 import pdb
 
+import datetime
+
 import numpy as np
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 import torch
 from PIL import Image
 from matplotlib import pyplot as plt
@@ -27,7 +29,16 @@ from utils_mmdet import model_train
 
 target_label_set = set([0, 2, 3, 9, 11])
 
-def PM_tensor_weight_balancing(im, adv, target, w, ensemble, eps, n_iters, alpha, dataset='voc', weight_balancing=False):
+def generate_mask(image_shape, bounding_boxes):
+    mask = np.ones(image_shape, dtype=np.uint8)
+
+    for box in bounding_boxes:
+        x1, y1, x2, y2 = box
+        
+        mask[int(y1):int(y2), int(x1):int(x2)] = 0
+    return mask
+
+def PM_tensor_weight_balancing(im, adv, target, w, ensemble, eps, n_iters, alpha, dataset='voc', weight_balancing=True):
     """perturbation machine, balance the weights of different surrogate models
     args:
         im (tensor): original image, shape [1,3,h,w].cuda()
@@ -76,12 +87,18 @@ def PM_tensor_weight_balancing(im, adv, target, w, ensemble, eps, n_iters, alpha
             pert = pert - alpha*torch.sign(pert.grad)
             pert = pert.clamp(min=-eps, max=eps)
             LOSS['ens'].append(loss_ens.item())
+
+            # add mask to attack only specify objection area/range
+            # mask = torch.from_numpy(generate_mask(pert.shape[-2:], bboxes_tgt)).to("cuda")
+            mask = torch.from_numpy(generate_mask(pert.shape[-2:], bboxes_tgt)).to(pert.device)
+            pert = pert.masked_fill(mask.bool(), 0)
+
             adv = (im + pert).clip(0, 255)
             adv_list.append(adv)
     return adv_list, LOSS
 
 
-def PM_tensor_weight_balancing_np(im_np, target, w_np, ensemble, eps, n_iters, alpha, dataset='voc', weight_balancing=False, adv_init=None):
+def PM_tensor_weight_balancing_np(im_np, target, w_np, ensemble, eps, n_iters, alpha, dataset='voc', weight_balancing=True, adv_init=None):
     """perturbation machine, numpy input version
     
     """
@@ -184,18 +201,18 @@ def save_det_to_fig(im_np, adv_np, LOSS, target_clean, all_models, im_id, im_idx
 
 def main():
     parser = argparse.ArgumentParser(description="generate perturbations")
-    parser.add_argument("--eps", type=int, default=10, help="perturbation level: 10,20,30,40,50")
+    parser.add_argument("--eps", type=int, default=50, help="perturbation level: 10,20,30,40,50")
     parser.add_argument("--iters", type=int, default=20, help="number of inner iterations: 5,6,10,20...")
     # parser.add_argument("--gpu", type=int, default=0, help="GPU ID: 0,1")
     parser.add_argument("--root", type=str, default='result', help="the folder name of result")
     parser.add_argument("--victim", type=str, default='DETR', help="victim model")
     parser.add_argument("--x", type=int, default=3, help="times alpha by x")
-    parser.add_argument("--n_wb", type=int, default=1, help="number of models in the ensemble")
-    parser.add_argument("--surrogate", type=str, default='YOLOX', help="surrogate model when n_wb=1")
+    parser.add_argument("--n_wb", type=int, default=4, help="number of models in the ensemble")
+    parser.add_argument("--surrogate", type=str, default='YOLOv3', help="surrogate model when n_wb=1")
     # parser.add_argument("-untargeted", action='store_true', help="run untargeted attack")
     # parser.add_argument("--loss_name", type=str, default='cw', help="the name of the loss")
     parser.add_argument("--lr", type=float, default=1e-2, help="learning rate of w")
-    parser.add_argument("--iterw", type=int, default=10, help="iterations of updating w")
+    parser.add_argument("--iterw", type=int, default=3, help="iterations of updating w")
     parser.add_argument("--dataset", type=str, default='coco', help="model dataset 'voc' or 'coco'. This will change the output range of detectors.")
     parser.add_argument("-single", action='store_true', help="only care about one obj")
     parser.add_argument("-no_balancing", action='store_true', help="do not balance weights at beginning")
@@ -215,7 +232,8 @@ def main():
     # load surrogate models
     ensemble = []
     # models_all = ['Faster R-CNN', 'YOLOv3', 'YOLOX', 'Grid R-CNN', 'SSD']
-    models_all = ['YOLOv3', 'YOLOX', 'Grid R-CNN', 'SSD']
+    # models_all = ['YOLOv3', 'YOLOX', 'ViTDET', 'GLIP']
+    models_all = ['Faster R-CNN', 'YOLOv3','YOLOX', 'CO-DETR2']
     model_list = models_all[:n_wb]
     if n_wb == 1:
         model_list = [args.surrogate]
@@ -244,6 +262,10 @@ def main():
         exp_name += '_single'
     if args.no_balancing:
         exp_name += '_noBalancing'
+
+    current_time = datetime.datetime.now()
+    formatted_time = current_time.strftime("%Y_%m_%d_%H_%M")
+    exp_name += f'_{formatted_time}'
 
     print(f"\nExperiment: {exp_name} \n")
     result_root = Path(f"results_detection_voc/")
@@ -296,29 +318,50 @@ def main():
         else:
             dict_k_valid_id_v_success_list[im_id] = []
 
-        all_categories = set(labels.astype(int))  # all apperaing objects in the scene
-        # randomly select a victim
-        victim_idx = random.randint(0,len(det)-1)
-        victim_class = int(det[victim_idx,4])
+        # all_categories = set(labels.astype(int))  # all apperaing objects in the scene
+        # # randomly select a victim
+        # victim_idx = random.randint(0,len(det)-1)
+        # victim_class = int(det[victim_idx,4])
 
-        # randomly select a target
-        select_n = 1 # for each victim object, randomly select 5 target objects
-        # target_pool = list(set(range(n_labels)) - all_categories)
-        target_pool = list(target_label_set - set([victim_class]))
-        target_pool = np.random.permutation(target_pool)[:select_n]
+        # # randomly select a target
+        # select_n = 1 # for each victim object, randomly select 5 target objects
+        # # target_pool = list(set(range(n_labels)) - all_categories)
+        # target_pool = list(target_label_set - set([victim_class]))
+        # target_pool = np.random.permutation(target_pool)[:select_n]
 
-        # for target_class in target_pool:
-        target_class = int(target_pool[0])
+        # # for target_class in target_pool:
+        # target_class = int(target_pool[0])
+
+        target = det.copy()
+        attack_goal = ""
+        for victim_idx in range(0, len(det)):
+            # randomly select a victim
+            # victim_idx = random.randint(0,len(det)-1)
+            victim_class = int(det[victim_idx,4])
+
+            # randomly select a target
+            select_n = 1 # for each victim object, randomly select 5 target objects
+            # target_pool = list(set(range(n_labels)) - all_categories)
+            target_pool = list(target_label_set - set([victim_class]))
+            target_pool = np.random.permutation(target_pool)[:select_n]
+
+            # for target_class in target_pool:
+            target_class = int(target_pool[0])
+
+            # basic information of attack
+            attack_goal += f"{label_names[victim_class]} to {label_names[target_class]}\n"
+            target[victim_idx, 4] = target_class
+
 
         # basic information of attack
-        attack_goal = f"{label_names[victim_class]} to {label_names[target_class]}"
+        # attack_goal = f"{label_names[victim_class]} to {label_names[target_class]}"
         info = f"im_idx: {im_idx}, im_id: {im_id}, victim_class: {label_names[victim_class]}, target_class: {label_names[target_class]}\n"
         print(info)
         file = open(exp_root / f'{exp_name}.txt', 'a')
         file.write(f"{info}\n\n")
         file.close()
 
-        target = det.copy()
+        # target = det.copy()
         # only change one label
         target[victim_idx, 4] = target_class
         # only keep one label
