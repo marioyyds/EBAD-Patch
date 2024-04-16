@@ -5,3 +5,4 @@ nohup.out
 mask_new_all
 mask_new_all_2
 data/CVPR_Adversarial/*.jpg
+results_voc

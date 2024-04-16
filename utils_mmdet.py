@@ -19,8 +19,6 @@ from mmdet.apis import inference_detector
 
 from mmdet_model_info import model_info
 
-from mmengine.runner import Runner
-
 
 VOC_BBOX_LABEL_NAMES = (
     'aeroplane',
@@ -287,10 +285,7 @@ def output2det(outputs, im, conf_thres=0.5, dataset='voc'):
         dataset (str): if use 'voc', only the labels within the voc dataset will be returned
     """
     det = []
-    # for idx, items in enumerate(outputs):
-    # for idx, items in outputs.pred_instances:
-    #     for item in items:
-    #         det.append(item[:4].tolist() + [idx] + item[4:].tolist())
+
     for it in outputs.pred_instances:
         det.append(it.bboxes.squeeze().tolist() + it.labels.tolist() + it.scores.tolist())
     det = np.array(det)
@@ -312,13 +307,6 @@ def output2det(outputs, im, conf_thres=0.5, dataset='voc'):
                 det[idx,4] = voc2coco.index(item[4])
         det = det[det[:,4] != -1]
 
-    # make the value in range
-    # m, n, _ = im.shape
-    # for item in det:
-    #     item[0] = min(max(item[0],0),n)
-    #     item[2] = min(max(item[2],0),n)
-    #     item[1] = min(max(item[1],0),m)
-    #     item[3] = min(max(item[3],0),m)
     return det
 
 
@@ -384,8 +372,6 @@ def get_test_data(model, im):
     Returns:
         data_train (): train data format
     """
-    # from mmdet.datasets import replace_ImageToTensor
-    # from mmdet.datasets.pipelines import Compose
     from mmcv.transforms import Compose
     from mmengine.dataset import default_collate
 
@@ -396,23 +382,13 @@ def get_test_data(model, im):
     cfg.test_dataloader.dataset.pipeline[0].type = 'LoadImageFromNDArray'
     # cfg.test_dataloader.dataset.pipeline = replace_ImageToTensor(cfg.data.test.pipeline)
     test_pipeline = Compose(cfg.test_dataloader.dataset.pipeline)
-    # transform_broadcaster = cfg.test_dataloader.dataset.pipeline[0].copy()
-    # for transform in transform_broadcaster['transforms']:
-    #     if transform['type'] == 'Resize':
-    #         transform_broadcaster['transforms'] = transform
-    # pack_track_inputs = cfg.test_dataloader.dataset.pipeline[-1].copy()
-    # test_pipeline = Compose([transform_broadcaster, pack_track_inputs])
 
-    # test_pipeline = build_test_pipeline(cfg)
     datas = []
     data = dict(img=im)
     data = test_pipeline(data)
     datas.append(data)
     data = default_collate(datas)
-    # data['inputs'] = [img_metas.data[0] for img_metas in data['inputs']]
-    # data['data_samples'] = [img.data[0] for img in data['data_samples']]
-    # data['data_samples'].to(device)
-    # data = scatter(data, [device])[0]
+
     data['inputs'].to(device)
     return data
 
@@ -452,7 +428,7 @@ def get_train_data(model, im, pert, data, bboxes, labels):
     gt_bboxes[:, 1::2] = np.clip(gt_bboxes[:, 1::2], 0, image_sizes[0])
     data_train['data_samples'].gt_instances['bboxes'] = torch.from_numpy(gt_bboxes).to(device)
     data_train['data_samples'].gt_instances['labels'] = torch.from_numpy(labels).to(device)
-    # img = F.interpolate(img, size=image_sizes, mode='nearest')
+
     img = F.interpolate(img, size=image_sizes, mode='bilinear', align_corners=True)
 
     batch_input_shape = tuple(data_train['inputs'].size()[-2:])
@@ -460,21 +436,8 @@ def get_train_data(model, im, pert, data, bboxes, labels):
         'batch_input_shape': batch_input_shape,
         'pad_shape': data_train['inputs'].shape
     })
-    # 'type': 'Normalize', 'mean': [103.53, 116.28, 123.675], 'std': [1.0, 1.0, 1.0], 'to_rgb': False
-    # img_norm_cfg = data_train['img_metas'][0]['img_norm_cfg']
-    # mean = img_norm_cfg['mean']
-    # std = img_norm_cfg['std']
-    # transform = transforms.Normalize(mean=mean, std=std)
-    # img = transform(img)
 
-    # 'type': 'Pad', 'size_divisor': 32
-    # pad_sizes = data_train['img_metas'][0]['pad_shape'][:2]
-    # left = top = 0
-    # bottom = pad_sizes[0] - image_sizes[0]
-    # right = pad_sizes[1] - image_sizes[1]
-    # img = F.pad(img, (left, right, top, bottom), "constant", 0)
     data_train['inputs'] = img
-    # data_train['inputs'] = [data_train['inputs']]
     data_train['data_samples'] = [data_train['data_samples']]
     return data_train
 
@@ -507,8 +470,6 @@ def get_loss_from_dict(model_name, loss_dict):
                 f'{loss_name} is not a tensor or list of tensors')
 
     loss = sum(value for key, value in log_vars if 'loss' in key)
-    # log_vars.insert(0, ['loss', loss])
-    # log_vars = OrderedDict(log_vars)  # type: ignore
 
     return loss
 
@@ -562,23 +523,11 @@ class model_train(torch.nn.Module):
         """
         data = get_test_data(self.model, x)
         data_train = get_train_data(self.model, x, pert.to(self.device), data, bboxes_tgt, labels_tgt)
-        # loss_dict = self.model(mode="loss", **data_train)
-        # optim.load_state_dict(cfg)
-        # from mmengine.registry import MODELS
-        # data_preprocessor = MODELS.build(data_preprocessor)
-        # data_train = data_preprocessor(data)
-        # from mmdet.models import DetDataPreprocessor
-        # dataprocessor = DetDataPreprocessor()
 
-        # loss_dict = self.model.train_step(data_train, optim_wrapper = self.optim)
+        # calculate loss
         loss_dict = self.model(mode = "loss", **data_train)
-        # cfg = self.model.cfg
-        # from mmengine.runner import Runner
-
-        # self.runner = Runner(self.model, train_dataloader=cf)
-
-        # print(f"loss_dict: {loss_dict}")
         loss = get_loss_from_dict(self.model_name, loss_dict)
+        
         return loss
 
     def rgb(self):

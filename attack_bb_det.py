@@ -87,7 +87,9 @@ def PM_tensor_weight_balancing(im, adv, target, w, ensemble, eps, n_iters, alpha
             pert = pert - alpha*torch.sign(pert.grad)
             pert = pert.clamp(min=-eps, max=eps)
             LOSS['ens'].append(loss_ens.item())
-
+            
+            # need to check whether needs to mask
+            
             # add mask to attack only specify objection area/range
             # mask = torch.from_numpy(generate_mask(pert.shape[-2:], bboxes_tgt)).to("cuda")
             mask = torch.from_numpy(generate_mask(pert.shape[-2:], bboxes_tgt)).to(pert.device)
@@ -231,8 +233,7 @@ def main():
 
     # load surrogate models
     ensemble = []
-    # models_all = ['Faster R-CNN', 'YOLOv3', 'YOLOX', 'Grid R-CNN', 'SSD']
-    # models_all = ['YOLOv3', 'YOLOX', 'ViTDET', 'GLIP']
+
     models_all = ['Faster R-CNN', 'YOLOv3','YOLOX', 'CO-DETR2']
     model_list = models_all[:n_wb]
     if n_wb == 1:
