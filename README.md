@@ -1,17 +1,9 @@
 # Ensemble-based Blackbox Attacks on Dense Prediction
-### [Paper](https://arxiv.org/abs/2303.14304) | [Code](https://github.com/CSIPlab/EBAD) | [Poster](https://cvpr2023.thecvf.com/media/PosterPDFs/CVPR%202023/21780.png?t=1685590835.2844174) | [Talk](https://youtu.be/4z7dHpq3u5s)
 
-
-Pytorch implementation of *Ensemble-based Blackbox Attacks on Dense Prediction* in CVPR 2023.
-
-[Ensemble-based Blackbox Attacks on Dense Prediction](https://arxiv.org/abs/2303.14304)  
- [Zikui Cai](https://zikuicai.github.io/), [Yaoteng Tan](https://ytengtan.github.io/), [M. Salman Asif](https://intra.ece.ucr.edu/~sasif/)<br>
- UC Riverside 
-
-We propose an approach for adversarial attacks on dense prediction models (such as object detectors and segmentation). In this paper, we show that a carefully designed ensemble can create effective attacks for a number of victim models. In particular, we show that normalization of the weights for individual models plays a critical role in the success of the attacks. We then demonstrate that by adjusting the weights of the ensemble according to the victim model can further improve the performance of the attacks. Finally, we show that our proposed method can also generate a single perturbation that can fool multiple blackbox detection and segmentation models simultaneously.
-
+This repo is referred to the [paper](https://arxiv.org/abs/2303.14304) and [code](https://github.com/CSIPlab/EBAD). And compared with original code, it has upgrade the mmdetection version to ***v3.3.0***, which means it will support more models to attack.
 
 ## Attack multiple blackbox models (detection and segmentation) using a single perturbation.
+
 Below we generate perturbation to map the Bicycle on the right-hand-side to Train (top), and map the Car in the middle to Traffic Light (bottom). More details are in the [paper](https://arxiv.org/abs/2303.14304).
 
 <center>
@@ -36,26 +28,19 @@ Click on the images to play videos.
 ## Environment
 
 * python==3.8
-* torch==1.11.0
-* torchvision==0.12.0
-* mmcv-full==1.5.1
-* [mmdetection v2.24.1](https://github.com/open-mmlab/mmdetection/tree/v2.24.1)
-* [mmsegmentation v0.27.0](https://github.com/open-mmlab/mmsegmentation/tree/v0.27.0)
+* [mmdetection v3.3.0](https://github.com/open-mmlab/mmdetection/tree/v3.3.0)
+* pip install -r requirements.txt
 
 
 ## Datasets
 
 Object detection: get VOC and COCO datasets under `/data` folder.
-```
+
+```shell
 cd data
 bash get_voc.sh
 bash get_coco.sh
 ```
-
-
-Semantic segmentation:
-Download and prepare Cityscapes and VOC datasets by the [instructions](https://mmsegmentation.readthedocs.io/en/latest/dataset_prepare.html). Place dataset folders under `mmsegmentation/data` folder.
-
 
 ## Perform attacks
 
@@ -67,47 +52,10 @@ Download and prepare Cityscapes and VOC datasets by the [instructions](https://m
 
 3. run ```python attack_bb_det.py``` to perform attacks on object detection.
 
-### Semantic segmentation
+## Acknowledgement
 
-1. Download and place `mmsegmentation` folder under EBAD directory.
-
-2. Download and proccess datasets. Place dataset folders under `mmsegmentation/data/`.
-
-3. Replace definition of ```simple_test``` in `mmsegmentation/mmseg/models/segmentors/encoder_decoder.py` with following code block in order to support our attack algorithm.
-```
-def simple_test(self, img, img_meta, rescale=True):
-    """Simple test with single image."""
-    seg_logit = self.inference(img, img_meta, rescale)
-    seg_pred = seg_logit.argmax(dim=1) # clean prediction
-    seg_pred_ll = seg_logit.argmin(dim=1)  # least likely
-    seg_pred_ml = seg_logit.topk(2, dim=1).indices[:, 1, :] # 2nd-most likely
-    if torch.onnx.is_in_onnx_export():
-        # our inference backend only support 4D output
-        seg_pred = seg_pred.unsqueeze(0)
-        return seg_pred
-    seg_pred = seg_pred.cpu().numpy()
-    seg_pred_ll = seg_pred_ll.cpu().numpy()
-    seg_pred_ml = seg_pred_ml.cpu().numpy()
-    # unravel batch dim
-    seg_pred = list(seg_pred)
-    seg_pred_ll = list(seg_pred_ll)
-    seg_pred_ml = list(seg_pred_ml)
-    return seg_pred + seg_pred_ml + seg_pred_ll
-```
-4. run ```python mmseg_model_info_cityscapes.py``` and```python mmseg_model_info_voc.py``` to download pre-trained models from MMCV.
-
-5. run ```python attack_bb_seg.py --target ll --n_wb 2 --iterw 20 --n_imgs 10 --victim PSPNet --data cityscapes```
-    to perform a N=2, Q=20 targeted ensemble attack using least-likely label against PSPNet on 10 Cityscapes images
-    
-    Use ```-untargeted``` option to perform untargeted attack.
-    Use ```-save_queries``` to save visualization of each attack query result, and use ```-visualize``` to save visualization of our attack.
-
-### Joint attack
-To perform attacks on object detection and segmentation jointly, run ```python attack_bb_det_seg.py```.
-
-
-## Citation
-```
+We thank the models support from [MMCV](https://github.com/open-mmlab/mmcv).   
+```shell
 @InProceedings{Cai_2023_CVPR,
     author    = {Cai, Zikui and Tan, Yaoteng and Asif, M. Salman},
     title     = {Ensemble-Based Blackbox Attacks on Dense Prediction},
@@ -117,7 +65,3 @@ To perform attacks on object detection and segmentation jointly, run ```python a
     pages     = {4045-4055}
 }
 ```
-
-
-## Acknowledgement
-We thank the models support from [MMCV](https://github.com/open-mmlab/mmcv).
