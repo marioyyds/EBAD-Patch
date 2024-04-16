@@ -252,7 +252,6 @@ def main():
     all_model_names = model_list + [victim_name]
     all_models = ensemble + [model_victim]
 
-
     # create folders
     exp_name = f'BB_{n_wb}wb_linf_{eps}_iters{n_iters}_alphax{x_alpha}_victim_{victim_name}_lr{lr_w}_iterw{iterw}'
     if dataset != 'voc':
@@ -267,7 +266,6 @@ def main():
     current_time = datetime.datetime.now()
     formatted_time = current_time.strftime("%Y_%m_%d_%H_%M")
     exp_name += f'_{formatted_time}'
-
     print(f"\nExperiment: {exp_name} \n")
     result_root = Path(f"results_detection_voc/")
     exp_root = result_root / exp_name
