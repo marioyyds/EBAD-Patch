@@ -10,8 +10,27 @@ Below we generate perturbation to attack objects, such as car, person, stop sign
 
 ## Environment
 
+* clone repo  
+
+```shell
+git clone --recursive git@github.com:marioyyds/myEBAD.git
+```
+
 * python==3.8
 * [mmdetection v3.3.0](https://github.com/open-mmlab/mmdetection/tree/v3.3.0)
+
+```shell
+# case 1 (recommended)
+cd mmdetection
+pip install -v -e .
+
+# case 2
+pip install -U openmim
+mim install mmengine
+mim install "mmcv>=2.0.0"
+mim install mmdet==3.3.0
+```
+
 * pip install -r requirements.txt
 
 ## Datasets
