@@ -455,6 +455,11 @@ def get_train_data(model, im, pert, data, bboxes, labels):
     # img = F.interpolate(img, size=image_sizes, mode='nearest')
     img = F.interpolate(img, size=image_sizes, mode='bilinear', align_corners=True)
 
+    batch_input_shape = tuple(data_train['inputs'].size()[-2:])
+    data_train['data_samples'].set_metainfo({
+        'batch_input_shape': batch_input_shape,
+        'pad_shape': data_train['inputs'].shape
+    })
     # 'type': 'Normalize', 'mean': [103.53, 116.28, 123.675], 'std': [1.0, 1.0, 1.0], 'to_rgb': False
     # img_norm_cfg = data_train['img_metas'][0]['img_norm_cfg']
     # mean = img_norm_cfg['mean']
@@ -474,29 +479,38 @@ def get_train_data(model, im, pert, data, bboxes, labels):
     return data_train
 
 
+
+
 def get_loss_from_dict(model_name, loss_dict):
-    """Return the correct loss based on the model type
-    Args:
-        model_name (~ str): the mmdet model name, eg: 'Faster R-CNN', 'YOLOv3', 'RetinaNet', 'FreeAnchor' ...
-        loss_dict (~ dict): the loss of the model, stored in a dictionary
-    Returns:
-        losses (~ torch.Tensor): the summation of the loss
     """
-    # if model_name in ['Faster R-CNN', 'Libra R-CNN', 'GN+WS']:
-    #     losses = loss_dict['loss_cls'] + loss_dict['loss_bbox'] + sum(loss_dict['loss_rpn_cls']) + sum(loss_dict['loss_rpn_bbox'])
-    #     # losses = sum(loss_dict.values())
-    # elif model_name in ['Grid R-CNN']:
-    #     losses = loss_dict['loss_cls'] + sum(loss_dict['loss_rpn_cls']) + sum(loss_dict['loss_rpn_bbox'])
-    # elif model_name in ['YOLOv3', 'RetinaNet', 'RepPoints', 'SSD']:
-    #     losses = sum(sum(loss_dict[key]) for key in loss_dict)
-    # else: # ['FreeAnchor', 'DETR', 'CenterNet', 'YOLOX', 'FoveaBox']
-    #     losses = sum(loss_dict.values())
-    # losses = 0
-    # for loss_name, loss_val in loss_dict:
-    #     losses += loss_val
-    # losses = sum(loss_dict.values())
-    losses = loss_dict["loss"]
-    return losses
+    Args:
+        losses (dict): Raw output of the network, which usually contain
+            losses and other necessary information.
+
+    Returns:
+        tuple[Tensor, dict]: There are two elements. The first is the
+        loss tensor passed to optim_wrapper which may be a weighted sum
+        of all losses, and the second is log_vars which will be sent to
+        the logger.
+    """
+    from mmengine.utils import is_list_of
+    log_vars = []
+    for loss_name, loss_value in loss_dict.items():
+        if isinstance(loss_value, torch.Tensor):
+            log_vars.append([loss_name, loss_value.mean()])
+        elif is_list_of(loss_value, torch.Tensor):
+            log_vars.append(
+                [loss_name,
+                    sum(_loss.mean() for _loss in loss_value)])
+        else:
+            raise TypeError(
+                f'{loss_name} is not a tensor or list of tensors')
+
+    loss = sum(value for key, value in log_vars if 'loss' in key)
+    # log_vars.insert(0, ['loss', loss])
+    # log_vars = OrderedDict(log_vars)  # type: ignore
+
+    return loss
 
 
 class model_train(torch.nn.Module):
@@ -556,8 +570,8 @@ class model_train(torch.nn.Module):
         # from mmdet.models import DetDataPreprocessor
         # dataprocessor = DetDataPreprocessor()
 
-        loss_dict = self.model.train_step(data_train, optim_wrapper = self.optim)
-        # loss_dict = self.model(model = "loss", **data_train)
+        # loss_dict = self.model.train_step(data_train, optim_wrapper = self.optim)
+        loss_dict = self.model(mode = "loss", **data_train)
         # cfg = self.model.cfg
         # from mmengine.runner import Runner
 

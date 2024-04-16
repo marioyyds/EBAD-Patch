@@ -102,6 +102,36 @@ model_info = {
         'config_file': 'configs/atss/atss_r50_fpn_1x_coco.py',
         'checkpoint_file': 'checkpoints/atss_r50_fpn_1x_coco_20200209-985f7bd0.pth',
         'download_link': 'https://download.openmmlab.com/mmdetection/v2.0/atss/atss_r50_fpn_1x_coco/atss_r50_fpn_1x_coco_20200209-985f7bd0.pth'
+    },
+    'CO-DETR': {
+        'config_file': 'projects/CO-DETR/configs/codino/co_dino_5scale_swin_l_16xb1_16e_o365tococo.py',
+        'checkpoint_file': 'checkpoints/co_dino_5scale_swin_large_16e_o365tococo-614254c9.pth',
+        'download_link': 'https://download.openmmlab.com/mmdetection/v3.0/codetr/co_dino_5scale_swin_large_16e_o365tococo-614254c9.pth'
+    },
+    'ViTDET': {
+        'config_file': 'projects/ViTDet/configs/vitdet_mask-rcnn_vit-b-mae_lsj-100e.py',
+        'checkpoint_file': 'checkpoints/vitdet_mask-rcnn_vit-b-mae_lsj-100e_20230328_153519-e15fe294.pth',
+        'download_link': 'https://download.openmmlab.com/mmdetection/v3.0/vitdet/vitdet_mask-rcnn_vit-b-mae_lsj-100e/vitdet_mask-rcnn_vit-b-mae_lsj-100e_20230328_153519-e15fe294.pth'
+    },
+    'GLIP': {
+        'config_file': 'configs/glip/glip_atss_swin-l_fpn_dyhead_16xb2_ms-2x_funtune_coco.py',
+        'checkpoint_file': 'checkpoints/glip_atss_swin-l_fpn_dyhead_16xb2_ms-2x_funtune_coco_20230910_100800-e9be4274.pth',
+        'download_link': 'https://download.openmmlab.com/mmdetection/v3.0/glip/glip_atss_swin-l_fpn_dyhead_16xb2_ms-2x_funtune_coco/glip_atss_swin-l_fpn_dyhead_16xb2_ms-2x_funtune_coco_20230910_100800-e9be4274.pth'
+    },
+    'CO-DETR1': {
+        'config_file': 'projects/CO-DETR/configs/codino/co_dino_5scale_swin_l_16xb1_1x_coco.py',
+        'checkpoint_file': 'checkpoints/co_dino_5scale_swin_large_1x_coco-27c13da4.pth',
+        'download_link': 'https://download.openmmlab.com/mmdetection/v3.0/codetr/co_dino_5scale_swin_large_1x_coco-27c13da4.pth'
+    },
+    'CO-DETR2': {
+        'config_file': 'projects/CO-DETR/configs/codino/co_dino_5scale_r50_lsj_8xb2_3x_coco.py',
+        'checkpoint_file': 'checkpoints/co_dino_5scale_lsj_r50_3x_coco-fe5a6829.pth',
+        'download_link': 'https://download.openmmlab.com/mmdetection/v3.0/codetr/co_dino_5scale_lsj_r50_3x_coco-fe5a6829.pth'
+    },
+    'TOOD': {
+        'config_file': 'configs/tood/tood_r50_fpn_ms-2x_coco.py',
+        'checkpoint_file': 'checkpoints/tood_r50_fpn_mstrain_2x_coco_20211210_144231-3b23174c.pth',
+        'download_link': 'https://download.openmmlab.com/mmdetection/v2.0/tood/tood_r50_fpn_mstrain_2x_coco/tood_r50_fpn_mstrain_2x_coco_20211210_144231-3b23174c.pth'
     }
 }
 
