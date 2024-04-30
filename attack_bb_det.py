@@ -15,7 +15,7 @@ import datetime
 
 import numpy as np
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '2'
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 import torch
 from PIL import Image
 from matplotlib import pyplot as plt
@@ -267,7 +267,7 @@ def main():
     formatted_time = current_time.strftime("%Y_%m_%d_%H_%M")
     exp_name += f'_{formatted_time}'
     print(f"\nExperiment: {exp_name} \n")
-    result_root = Path(f"results_detection_voc/")
+    result_root = Path(f"results_detection_voc/phase2_result/")
     exp_root = result_root / exp_name
     log_root = exp_root / 'logs'
     log_root.mkdir(parents=True, exist_ok=True)
@@ -293,10 +293,10 @@ def main():
     dict_k_valid_id_v_success_list = {} # lists of success for all mdoels for valid im_ids
     n_obj_list = []
 
-    test_image_ids = JSON.load(open(f"data/CVPR_Adversarial/output.json"))
+    test_image_ids = JSON.load(open(f"data/test_phase2/output.json"))
     for im_idx, im_id in tqdm(enumerate(test_image_ids[:500])):
     # for im_idx, im_id in [(1, "000004")]:
-        im_root = Path("data/CVPR_Adversarial")
+        im_root = Path("data/test_phase2")
         im_path = im_root / f"{im_id}.jpg"
         im_np = np.array(Image.open(im_path).convert('RGB'))
         
