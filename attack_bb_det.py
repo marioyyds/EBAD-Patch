@@ -207,14 +207,14 @@ def main():
     parser.add_argument("--iters", type=int, default=20, help="number of inner iterations: 5,6,10,20...")
     # parser.add_argument("--gpu", type=int, default=0, help="GPU ID: 0,1")
     parser.add_argument("--root", type=str, default='result', help="the folder name of result")
-    parser.add_argument("--victim", type=str, default='DETR', help="victim model")
+    parser.add_argument("--victim", type=str, default='CO-DETR', help="victim model")
     parser.add_argument("--x", type=int, default=3, help="times alpha by x")
-    parser.add_argument("--n_wb", type=int, default=4, help="number of models in the ensemble")
+    parser.add_argument("--n_wb", type=int, default=6, help="number of models in the ensemble")
     parser.add_argument("--surrogate", type=str, default='YOLOv3', help="surrogate model when n_wb=1")
     # parser.add_argument("-untargeted", action='store_true', help="run untargeted attack")
     # parser.add_argument("--loss_name", type=str, default='cw', help="the name of the loss")
     parser.add_argument("--lr", type=float, default=1e-2, help="learning rate of w")
-    parser.add_argument("--iterw", type=int, default=3, help="iterations of updating w")
+    parser.add_argument("--iterw", type=int, default=10, help="iterations of updating w")
     parser.add_argument("--dataset", type=str, default='coco', help="model dataset 'voc' or 'coco'. This will change the output range of detectors.")
     parser.add_argument("-single", action='store_true', help="only care about one obj")
     parser.add_argument("-no_balancing", action='store_true', help="do not balance weights at beginning")
@@ -234,7 +234,7 @@ def main():
     # load surrogate models
     ensemble = []
 
-    models_all = ['Faster R-CNN', 'YOLOv3','YOLOX', 'CO-DETR2']
+    models_all = ['Faster R-CNN', 'YOLOv3', 'YOLOX', 'CO-DETR2', 'DETR', 'Sparse R-CNN', 'DINO']
     model_list = models_all[:n_wb]
     if n_wb == 1:
         model_list = [args.surrogate]
