@@ -132,6 +132,16 @@ model_info = {
         'config_file': 'configs/tood/tood_r50_fpn_ms-2x_coco.py',
         'checkpoint_file': 'checkpoints/tood_r50_fpn_mstrain_2x_coco_20211210_144231-3b23174c.pth',
         'download_link': 'https://download.openmmlab.com/mmdetection/v2.0/tood/tood_r50_fpn_mstrain_2x_coco/tood_r50_fpn_mstrain_2x_coco_20211210_144231-3b23174c.pth'
+    },
+    'Sparse R-CNN': {
+        'config_file': 'configs/sparse_rcnn/sparse-rcnn_r101_fpn_300-proposals_crop-ms-480-800-3x_coco.py',
+        'checkpoint_file': 'checkpoints/sparse_rcnn_r101_fpn_300_proposals_crop_mstrain_480-800_3x_coco_20201223_023452-c23c3564.pth',
+        'download_link': 'https://download.openmmlab.com/mmdetection/v2.0/sparse_rcnn/sparse_rcnn_r101_fpn_300_proposals_crop_mstrain_480-800_3x_coco/sparse_rcnn_r101_fpn_300_proposals_crop_mstrain_480-800_3x_coco_20201223_023452-c23c3564.pth'
+    },
+    'DINO': {
+        'config_file': 'configs/dino/dino-5scale_swin-l_8xb2-36e_coco.py',
+        'checkpoint_file': 'checkpoints/dino-5scale_swin-l_8xb2-36e_coco-5486e051.pth',
+        'download_link': 'https://github.com/RistoranteRist/mmlab-weights/releases/download/dino-swinl/dino-5scale_swin-l_8xb2-36e_coco-5486e051.pth'
     }
 }
 
