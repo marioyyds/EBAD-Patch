@@ -29,6 +29,36 @@ from utils_mmdet import model_train
 
 target_label_set = set([0, 2, 3, 9, 11])
 
+def patch_initialization(image_size=(3, 224, 224), noise_percentage=0.06):
+    # mask_length = int((noise_percentage * image_size[1] * image_size[2])**0.5)
+    mask_length = 30
+    patch = np.random.rand(image_size[0], mask_length, mask_length)
+    return patch
+
+def patch_mask_generation(patch=None, image_size=(3, 224, 224), bounding_boxes = None):
+    applied_patch = np.zeros(image_size)
+    applied_patch_loc = []
+
+    rotation_angle = np.random.choice(4)
+    for i in range(patch.shape[0]):
+        patch[i] = np.rot90(patch[i], rotation_angle)  # The actual rotation angle is rotation_angle * 90
+    
+    for box in bounding_boxes:
+        x1, y1, x2, y2 = box
+        x_width = int(x2) - int(x1)
+        y_width = int(y2) - int(y1)
+        if patch.shape[1] < x_width/2 and patch.shape[2] < y_width/2:
+            # patch location
+            x_location, y_location = np.random.randint(low=0, high=x_width-patch.shape[1]), np.random.randint(low=0, high=y_width-patch.shape[2])
+            
+            applied_patch[:, int(y1) + y_location:int(y1) + y_location + patch.shape[2], int(x1) + x_location:int(x1) + x_location + patch.shape[1]] = patch
+            applied_patch_loc.append((int(x1) + x_location, int(y1) + y_location))
+
+    mask = applied_patch.copy()
+    mask[mask != 0] = 1.0
+    mask = np.logical_not(mask)
+    return applied_patch, applied_patch_loc, mask
+
 def generate_mask(image_shape, bounding_boxes):
     mask = np.ones(image_shape, dtype=np.uint8)
 
@@ -38,7 +68,7 @@ def generate_mask(image_shape, bounding_boxes):
         mask[int(y1):int(y2), int(x1):int(x2)] = 0
     return mask
 
-def PM_tensor_weight_balancing(im, adv, target, w, ensemble, eps, n_iters, alpha, dataset='voc', weight_balancing=True):
+def PM_tensor_weight_balancing(im, adv, target, w, ensemble, eps, n_iters, alpha, dataset='voc', weight_balancing=True, patch = None):
     """perturbation machine, balance the weights of different surrogate models
     args:
         im (tensor): original image, shape [1,3,h,w].cuda()
@@ -65,6 +95,7 @@ def PM_tensor_weight_balancing(im, adv, target, w, ensemble, eps, n_iters, alpha
     adv_list = []
     pert = adv - im
     LOSS = defaultdict(list) # loss lists for different models
+
     for i in range(n_iters):
         pert.requires_grad = True
         loss_list = []
@@ -95,12 +126,47 @@ def PM_tensor_weight_balancing(im, adv, target, w, ensemble, eps, n_iters, alpha
             mask = torch.from_numpy(generate_mask(pert.shape[-2:], bboxes_tgt)).to(pert.device)
             pert = pert.masked_fill(mask.bool(), 0)
 
-            adv = (im + pert).clip(0, 255)
+            adv = (im + pert).clip(0, 255) 
             adv_list.append(adv)
-    return adv_list, LOSS
 
 
-def PM_tensor_weight_balancing_np(im_np, target, w_np, ensemble, eps, n_iters, alpha, dataset='voc', weight_balancing=True, adv_init=None):
+    # im_np
+    applied_patch, applied_patch_loc, patch_mask = patch_mask_generation(patch, im.shape[1:], bboxes_tgt)
+    applied_patch = torch.from_numpy(applied_patch).unsqueeze(0).float()
+    patch_mask = patch_mask.transpose(1, 2, 0)
+    mask_im_np = im_np.copy()
+    mask_im_np = mask_im_np * patch_mask
+    for i in range(n_iters):
+        applied_patch.requires_grad = True
+        loss_list = []
+        loss_list_np = []
+        for model in ensemble:
+            loss = model.loss(mask_im_np, applied_patch, bboxes_tgt, labels_tgt)
+            loss_list.append(loss)
+            loss_list_np.append(loss.item())
+            LOSS[model.model_name].append(loss.item())
+        
+        loss_ens = sum(w[i]*loss_list[i] for i in range(len(ensemble)))
+        loss_ens.backward()
+
+        with torch.no_grad():
+            applied_patch = applied_patch - 1*torch.sign(applied_patch.grad)
+            applied_patch = applied_patch.clamp(min=-eps, max=eps)
+    
+    applied_patch = applied_patch.squeeze().cpu().numpy()
+    patch_tmp = np.zeros(patch.shape)
+    for loc in applied_patch_loc:
+        x, y = loc
+        patch_tmp += applied_patch[:, y:y + patch.shape[2], x:x + patch.shape[1]]
+    
+    patch = patch_tmp / len(applied_patch_loc)
+    # TODO
+    # patch_adv = mask_im_np + applied_patch.transpose(1, 2, 0).astype(np.uint8) * patch_mask
+    patch_adv = applied_patch.transpose(1, 2, 0).astype(np.uint8) * np.logical_not(patch_mask)
+    return adv_list, LOSS, patch, patch_adv, patch_mask
+
+
+def PM_tensor_weight_balancing_np(im_np, target, w_np, ensemble, eps, n_iters, alpha, dataset='voc', weight_balancing=True, adv_init=None, patch = None):
     """perturbation machine, numpy input version
     
     """
@@ -112,9 +178,11 @@ def PM_tensor_weight_balancing_np(im_np, target, w_np, ensemble, eps, n_iters, a
         adv = torch.from_numpy(adv_init).permute(2,0,1).unsqueeze(0).float().to(device)
 
     # w = torch.from_numpy(w_np).float().to(device)
-    adv_list, LOSS = PM_tensor_weight_balancing(im, adv, target, w_np, ensemble, eps, n_iters, alpha, dataset, weight_balancing)
+    adv_list, LOSS, patch, patch_adv, patch_mask= PM_tensor_weight_balancing(im, adv, target, w_np, ensemble, eps, n_iters, alpha, dataset, weight_balancing, patch)
     adv_np = adv_list[-1].squeeze().cpu().numpy().transpose(1, 2, 0).astype(np.uint8)
-    return adv_np, LOSS
+    # TODO
+    adv_np = adv_np * patch_mask + patch_adv
+    return adv_np, LOSS, patch, patch_adv
 
 
 def get_bb_loss(detections, target_clean, LOSS):
@@ -200,6 +268,64 @@ def save_det_to_fig(im_np, adv_np, LOSS, target_clean, all_models, im_id, im_idx
 
     return loss_bb, success_list
     
+def patch_save_det_to_fig(im_np, adv_np, LOSS, target_clean, all_models, im_id, im_idx, attack_goal, log_root, dataset, n_query):    
+    """get the loss bb, success_list on all surrogate models, and save detections to fig
+    
+    args:
+
+    returns:
+        loss_bb (float): loss on the victim model
+        success_list (list of 0/1s): successful for all models
+    """
+    fig_h = 5
+    fig_w = 5
+    n_all = len(all_models)
+    fig, ax = plt.subplots(2,1+n_all,figsize=((1+n_all)*fig_w,2*fig_h))
+    # 1st row, clean image, detection on surrogate models, detection on victim model
+    # 2nd row, perturbed image, detection on surrogate models, detection on victim model
+    row = 0
+    ax[row,0].imshow(im_np)
+    ax[row,0].set_title('clean image')
+    for model_idx, model in enumerate(all_models):
+        det_adv = model.det(im_np)
+
+        indices_to_remove = np.any(det_adv[:, 4:5] == np.array(list(target_label_set)), axis=1)
+        det_adv = det_adv[indices_to_remove]
+
+        bboxes, labels, scores = det_adv[:,:4], det_adv[:,4], det_adv[:,5]
+        vis_bbox(im_np, bboxes, labels, scores, ax=ax[row,model_idx+1], dataset=dataset)
+        ax[row,model_idx+1].set_title(model.model_name)
+
+    row = 1
+    ax[row,0].imshow(adv_np)
+    ax[row,0].set_title(f'adv image @ iter {n_query} \n {attack_goal}')
+    success_list = [] # 1 for success, 0 for fail for all models
+    for model_idx, model in enumerate(all_models):
+        det_adv = model.det(adv_np)
+
+        indices_to_remove = np.any(det_adv[:, 4:5] == np.array(list(target_label_set)), axis=1)
+        det_adv = det_adv[indices_to_remove]
+
+        bboxes, labels, scores = det_adv[:,:4], det_adv[:,4], det_adv[:,5]
+        vis_bbox(adv_np, bboxes, labels, scores, ax=ax[row,model_idx+1], dataset=dataset)
+        ax[row,model_idx+1].set_title(model.model_name)
+
+        # check for success and get bb loss
+        if model_idx == n_all-1:
+            loss_bb = get_bb_loss(det_adv, target_clean, LOSS)
+
+        # victim model is at the last index
+        success_list.append(is_success(det_adv, target_clean))
+    
+    plt.tight_layout()
+    if success_list[-1]:
+        plt.savefig(log_root / f"{im_idx}_{im_id}_iter{n_query}_success_patch.png")
+    else:
+        plt.savefig(log_root / f"{im_idx}_{im_id}_iter{n_query}_patch.png")
+    plt.close()
+
+    return loss_bb, success_list
+  
 
 def main():
     parser = argparse.ArgumentParser(description="generate perturbations")
@@ -214,7 +340,7 @@ def main():
     # parser.add_argument("-untargeted", action='store_true', help="run untargeted attack")
     # parser.add_argument("--loss_name", type=str, default='cw', help="the name of the loss")
     parser.add_argument("--lr", type=float, default=1e-2, help="learning rate of w")
-    parser.add_argument("--iterw", type=int, default=10, help="iterations of updating w")
+    parser.add_argument("--iterw", type=int, default=1, help="iterations of updating w")
     parser.add_argument("--dataset", type=str, default='coco', help="model dataset 'voc' or 'coco'. This will change the output range of detectors.")
     parser.add_argument("-single", action='store_true', help="only care about one obj")
     parser.add_argument("-no_balancing", action='store_true', help="do not balance weights at beginning")
@@ -294,6 +420,7 @@ def main():
     n_obj_list = []
 
     test_image_ids = JSON.load(open(f"data/test_phase2/output.json"))
+    patch = patch_initialization((3, 1912, 1028))
     for im_idx, im_id in tqdm(enumerate(test_image_ids[49:500])):
     # for im_idx, im_id in [(1, "000004")]:
         im_root = Path("data/test_phase2")
@@ -382,16 +509,17 @@ def main():
         else:
             # determine the initial w, via weight balancing
             dummy_w = np.ones(n_wb)
-            _, LOSS = PM_tensor_weight_balancing_np(im_np, target, dummy_w, ensemble, eps, n_iters=1, alpha=alpha, dataset=dataset)
+            _, LOSS, patch, patch_adv = PM_tensor_weight_balancing_np(im_np, target, dummy_w, ensemble, eps, n_iters=1, alpha=alpha, dataset=dataset, patch=patch)
             loss_list_np = [LOSS[name][0] for name in model_list]
             w_inv = 1 / np.array(loss_list_np)
             w_np = w_inv / w_inv.sum()
             print(f"w_np: {w_np}")
 
 
-        adv_np, LOSS = PM_tensor_weight_balancing_np(im_np, target, w_np, ensemble, eps, n_iters, alpha=alpha, dataset=dataset)
+        adv_np, LOSS, patch, patch_adv= PM_tensor_weight_balancing_np(im_np, target, w_np, ensemble, eps, n_iters, alpha=alpha, dataset=dataset, patch=patch)
         n_query = 0
         loss_bb, success_list = save_det_to_fig(im_np, adv_np, LOSS, target_clean, all_models, im_id, im_idx, attack_goal, log_root, dataset, n_query)
+        # patch_save_det_to_fig(im_np, patch_adv, LOSS, target_clean, all_models, im_id, im_idx, attack_goal, log_root, dataset, n_query)
         dict_k_valid_id_v_success_list[im_id].append(success_list)
 
         # save adv in folder
@@ -422,8 +550,9 @@ def main():
                 ##################################### query plus #####################################
                 w_np_temp_plus = w_np.copy()
                 w_np_temp_plus[idx_w] += lr_w * w_inv[idx_w]
-                adv_np_plus, LOSS_plus = PM_tensor_weight_balancing_np(im_np, target, w_np_temp_plus, ensemble, eps, n_iters, alpha=alpha, dataset=dataset, adv_init=adv_np)
+                adv_np_plus, LOSS_plus, patch, patch_adv = PM_tensor_weight_balancing_np(im_np, target, w_np_temp_plus, ensemble, eps, n_iters, alpha=alpha, dataset=dataset, adv_init=adv_np, patch=patch)
                 loss_bb_plus, success_list = save_det_to_fig(im_np, adv_np_plus, LOSS_plus, target_clean, all_models, im_id, im_idx, attack_goal, log_root, dataset, n_query)
+                # patch_save_det_to_fig(im_np, patch_adv, LOSS, target_clean, all_models, im_id, im_idx, attack_goal, log_root, dataset, n_query)
                 dict_k_valid_id_v_success_list[im_id].append(success_list)
 
                 n_query += 1
@@ -451,8 +580,9 @@ def main():
                 ##################################### query minus #####################################
                 w_np_temp_minus = w_np.copy()
                 w_np_temp_minus[idx_w] -= lr_w * w_inv[idx_w]
-                adv_np_minus, LOSS_minus = PM_tensor_weight_balancing_np(im_np, target, w_np_temp_minus, ensemble, eps, n_iters, alpha=alpha, dataset=dataset, adv_init=adv_np)
+                adv_np_minus, LOSS_minus, patch, patch_adv = PM_tensor_weight_balancing_np(im_np, target, w_np_temp_minus, ensemble, eps, n_iters, alpha=alpha, dataset=dataset, adv_init=adv_np, patch=patch)
                 loss_bb_minus, success_list = save_det_to_fig(im_np, adv_np_minus, LOSS_minus, target_clean, all_models, im_id, im_idx, attack_goal, log_root, dataset, n_query)
+                # patch_save_det_to_fig(im_np, patch_adv, LOSS, target_clean, all_models, im_id, im_idx, attack_goal, log_root, dataset, n_query)
                 dict_k_valid_id_v_success_list[im_id].append(success_list)
 
                 n_query += 1
