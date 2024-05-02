@@ -10,7 +10,7 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
-            "python": "/data/hdd3/duhao/miniconda3/envs/EBAD1/bin/python",
+            "python": "/home/heshiyuan/anaconda3/envs/myEBAD/bin/python",
             "justMyCode": false
         }
     ]
