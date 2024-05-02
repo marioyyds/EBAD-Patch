@@ -33,10 +33,10 @@ def generate_noise(image_shape, bounding_boxes):
 
 model = model_train(model_name="DETR", dataset="coco")
 
-test_image_ids = JSON.load(open(f"data/CVPR_Adversarial/output.json"))
+test_image_ids = JSON.load(open(f"data/test_phase2/output.json"))
 
 for img in test_image_ids:
-    im_path = f"/data/hdd3/duhao/code/EBAD1/data/CVPR_Adversarial/{img}.jpg"
+    im_path = f"/data/hdd3/duhao/code/EBAD1/data/test_phase2/{img}.jpg"
     adv_path = f"/data/hdd3/duhao/code/EBAD1/noise_all/{img}.jpg"
     im_np = np.array(Image.open(im_path).convert('RGB'))
 

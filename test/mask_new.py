@@ -33,8 +33,8 @@ def generate_mask_new(ori_img, image_shape, bounding_boxes):
 
     for box in bounding_boxes:
         x1, y1, x2, y2 = box
-        number = int(((x2-x1)*(y2-y1))/50)
-        number = min(number, 100)
+        number = int(((x2-x1)*(y2-y1))/100)
+        number = min(number, 30)
         # print(number)
         for i in range(number):
             mask_size = (min(5,int((y2 - y1)/4)), min(5,int((x2 - x1)/4)))  # mask 大小
@@ -80,12 +80,14 @@ def generate_noise(image_shape, bounding_boxes):
 
 model = model_train(model_name="DETR", dataset="coco")
 
-test_image_ids = JSON.load(open(f"data/CVPR_Adversarial/output.json"))
+test_image_ids = JSON.load(open(f"data/test_phase2/output.json"))
 
 for img in test_image_ids:
-    im_path = f"/data/hdd3/duhao/code/EBAD1/data/CVPR_Adversarial/{img}.jpg"
-    adv_path = f"/data/hdd3/duhao/code/EBAD1/mask_new_all_2/{img}.jpg"
+    im_path = f"/data/hdd3/duhao/code/EBAD1/data/test_phase2/{img}.jpg"
+    im_ens_adv_path = f"/data/hdd3/duhao/code/CVPR_Workshop24_Adversarial/data/phase2_16/images/{img}.jpg"
+    adv_path = f"/data/hdd3/duhao/code/EBAD1/mask_new_all_3/{img}.jpg"
     im_np = np.array(Image.open(im_path).convert('RGB'))
+    im_ens_adv_np = np.array(Image.open(im_ens_adv_path).convert('RGB'))
 
     # get detection on clean images and determine target class
     det = model.det(im_np)
@@ -96,7 +98,7 @@ for img in test_image_ids:
     bboxes, labels, scores = det[:,:4], det[:,4], det[:,5]
 
     # im = torch.from_numpy(im_np).permute(2,0,1).unsqueeze(0).float().to('cuda')
-    im = torch.from_numpy(im_np).permute(2,0,1).float()
+    im = torch.from_numpy(im_ens_adv_np).permute(2,0,1).float()
 
     # mask = generate_mask(im.shape[-2:], bboxes)
     # noise = generate_noise(im.shape[-2:], bboxes)

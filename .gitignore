@@ -4,5 +4,7 @@ __pycache__/
 nohup.out
 mask_new_all
 mask_new_all_2
+mask_new_all_3
+noise_all
 data/CVPR_Adversarial/*.jpg
 results_voc
