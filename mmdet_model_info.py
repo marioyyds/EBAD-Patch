@@ -142,6 +142,11 @@ model_info = {
         'config_file': 'configs/dino/dino-5scale_swin-l_8xb2-36e_coco.py',
         'checkpoint_file': 'checkpoints/dino-5scale_swin-l_8xb2-36e_coco-5486e051.pth',
         'download_link': 'https://github.com/RistoranteRist/mmlab-weights/releases/download/dino-swinl/dino-5scale_swin-l_8xb2-36e_coco-5486e051.pth'
+    },
+    'DDQ': {
+        'config_file': 'configs/ddq/ddq-detr-4scale_swinl_8xb2-30e_coco.py',
+        'checkpoint_file': 'checkpoints/ddq_detr_swinl_30e.pth',
+        'download_link': 'https://download.openmmlab.com/mmdetection/v3.0/ddq/ddq_detr_swinl_30e.pth'
     }
 }
 
