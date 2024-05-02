@@ -47,12 +47,13 @@ def patch_mask_generation(patch=None, image_size=(3, 224, 224), bounding_boxes =
         x1, y1, x2, y2 = box
         x_width = int(x2) - int(x1)
         y_width = int(y2) - int(y1)
-        if patch.shape[1] < x_width/2 and patch.shape[2] < y_width/2:
-            # patch location
-            x_location, y_location = np.random.randint(low=0, high=x_width-patch.shape[1]), np.random.randint(low=0, high=y_width-patch.shape[2])
-            
-            applied_patch[:, int(y1) + y_location:int(y1) + y_location + patch.shape[2], int(x1) + x_location:int(x1) + x_location + patch.shape[1]] = patch
-            applied_patch_loc.append((int(x1) + x_location, int(y1) + y_location))
+        if patch.shape[1] < x_width*0.75 and patch.shape[2] < y_width*0.75:
+            for mask_num in range(2):
+                # patch location
+                x_location, y_location = np.random.randint(low=0, high=x_width-patch.shape[1]), np.random.randint(low=0, high=y_width-patch.shape[2])
+                
+                applied_patch[:, int(y1) + y_location:int(y1) + y_location + patch.shape[2], int(x1) + x_location:int(x1) + x_location + patch.shape[1]] = patch
+                applied_patch_loc.append((int(x1) + x_location, int(y1) + y_location))
 
     mask = applied_patch.copy()
     mask[mask != 0] = 1.0
@@ -421,7 +422,7 @@ def main():
 
     test_image_ids = JSON.load(open(f"data/test_phase2/output.json"))
     patch = patch_initialization((3, 1912, 1028))
-    for im_idx, im_id in tqdm(enumerate(test_image_ids[49:500])):
+    for im_idx, im_id in tqdm(enumerate(test_image_ids[:500])):
     # for im_idx, im_id in [(1, "000004")]:
         im_root = Path("data/test_phase2")
         im_path = im_root / f"{im_id}.jpg"
