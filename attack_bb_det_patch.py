@@ -32,7 +32,7 @@ target_label_set = set([0, 2, 3, 9, 11])
 
 def patch_initialization(image_size=(3, 224, 224), noise_percentage=0.06):
     # mask_length = int((noise_percentage * image_size[1] * image_size[2])**0.5)
-    mask_length = 30
+    mask_length = 20
     patch = np.random.rand(image_size[0], mask_length, mask_length)
     return patch
 
@@ -49,7 +49,7 @@ def patch_mask_generation(patch=None, image_size=(3, 224, 224), bounding_boxes =
         x_width = int(x2) - int(x1)
         y_width = int(y2) - int(y1)
         if patch.shape[1] < x_width*0.75 and patch.shape[2] < y_width*0.75:
-            for mask_num in range(2):
+            for mask_num in range(1):
                 # patch location
                 x_location, y_location = np.random.randint(low=0, high=x_width-patch.shape[1]), np.random.randint(low=0, high=y_width-patch.shape[2])
                 
@@ -337,12 +337,12 @@ def main():
     parser.add_argument("--root", type=str, default='result', help="the folder name of result")
     parser.add_argument("--victim", type=str, default='CO-DETR', help="victim model")
     parser.add_argument("--x", type=int, default=3, help="times alpha by x")
-    parser.add_argument("--n_wb", type=int, default=6, help="number of models in the ensemble")
+    parser.add_argument("--n_wb", type=int, default=4, help="number of models in the ensemble")
     parser.add_argument("--surrogate", type=str, default='YOLOv3', help="surrogate model when n_wb=1")
     # parser.add_argument("-untargeted", action='store_true', help="run untargeted attack")
     # parser.add_argument("--loss_name", type=str, default='cw', help="the name of the loss")
     parser.add_argument("--lr", type=float, default=1e-2, help="learning rate of w")
-    parser.add_argument("--iterw", type=int, default=1, help="iterations of updating w")
+    parser.add_argument("--iterw", type=int, default=3, help="iterations of updating w")
     parser.add_argument("--dataset", type=str, default='coco', help="model dataset 'voc' or 'coco'. This will change the output range of detectors.")
     parser.add_argument("-single", action='store_true', help="only care about one obj")
     parser.add_argument("-no_balancing", action='store_true', help="do not balance weights at beginning")
@@ -362,7 +362,7 @@ def main():
     # load surrogate models
     ensemble = []
 
-    models_all = ['Faster R-CNN', 'YOLOv3', 'YOLOX', 'CO-DETR2', 'DETR', 'Sparse R-CNN', 'DINO']
+    models_all = ['Faster R-CNN', 'YOLOv3', 'YOLOX', 'Sparse R-CNN','CO-DETR2', 'DETR', 'DINO']
     model_list = models_all[:n_wb]
     if n_wb == 1:
         model_list = [args.surrogate]
@@ -461,26 +461,28 @@ def main():
         # target_class = int(target_pool[0])
 
         target = det.copy()
+        attack_goal = ""
+        for victim_idx in range(0, len(det)):
+            # randomly select a victim
+            # victim_idx = random.randint(0,len(det)-1)
+            victim_class = int(det[victim_idx,4])
 
-        # randomly select a victim
-        victim_idx = random.randint(0,len(det)-1)
-        victim_class = int(det[victim_idx,4])
+            # randomly select a target
+            select_n = 1 # for each victim object, randomly select 5 target objects
+            # target_pool = list(set(range(n_labels)) - all_categories)
+            target_pool = list(target_label_set - set([victim_class]))
+            target_pool = np.random.permutation(target_pool)[:select_n]
 
-        # randomly select a target
-        select_n = 1 # for each victim object, randomly select 5 target objects
-        # target_pool = list(set(range(n_labels)) - all_categories)
-        target_pool = list(target_label_set - set([victim_class]))
-        target_pool = np.random.permutation(target_pool)[:select_n]
+            # for target_class in target_pool:
+            target_class = int(target_pool[0])
 
-        # for target_class in target_pool:
-        target_class = int(target_pool[0])
+            # basic information of attack
+            attack_goal += f"{label_names[victim_class]} to {label_names[target_class]}\n"
+            target[victim_idx, 4] = target_class
+
 
         # basic information of attack
-        target[victim_idx, 4] = target_class
-
-
-        # basic information of attack
-        attack_goal = f"{label_names[victim_class]} to {label_names[target_class]}"
+        # attack_goal = f"{label_names[victim_class]} to {label_names[target_class]}"
         info = f"im_idx: {im_idx}, im_id: {im_id}, victim_class: {label_names[victim_class]}, target_class: {label_names[target_class]}\n"
         print(info)
         file = open(exp_root / f'{exp_name}.txt', 'a')
@@ -489,14 +491,12 @@ def main():
 
         # target = det.copy()
         # only change one label
-        # target[victim_idx, 4] = target_class
+        target[victim_idx, 4] = target_class
         # only keep one label
         target_clean = target[victim_idx,:][None]
 
-        # if args.single: # only care about the target object
-            # target = target_clean
-        target = target_clean
-
+        if args.single: # only care about the target object
+            target = target_clean
         # save target to np
         np.save(target_root/f"{im_id}_target", target)
 
