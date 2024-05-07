@@ -15,7 +15,7 @@ import datetime
 
 import numpy as np
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 import torch
 from PIL import Image
 from matplotlib import pyplot as plt
@@ -49,12 +49,17 @@ def patch_mask_generation(patch=None, image_size=(3, 224, 224), bounding_boxes =
         x_width = int(x2) - int(x1)
         y_width = int(y2) - int(y1)
         if patch.shape[1] < x_width*0.75 and patch.shape[2] < y_width*0.75:
-            for mask_num in range(2):
-                # patch location
-                x_location, y_location = np.random.randint(low=0, high=x_width-patch.shape[1]), np.random.randint(low=0, high=y_width-patch.shape[2])
-                
-                applied_patch[:, int(y1) + y_location:int(y1) + y_location + patch.shape[2], int(x1) + x_location:int(x1) + x_location + patch.shape[1]] = patch
-                applied_patch_loc.append((int(x1) + x_location, int(y1) + y_location))
+            # for mask_num in range(2):
+            #     # patch location
+            x_location, y_location = np.random.randint(low=0, high=x_width-patch.shape[1]), np.random.randint(low=0, high=y_width-patch.shape[2])
+            
+            applied_patch[:, int(y1) + y_location:int(y1) + y_location + patch.shape[2], int(x1) + x_location:int(x1) + x_location + patch.shape[1]] = patch
+            applied_patch_loc.append((int(x1) + x_location, int(y1) + y_location))
+        elif int(x1) + patch.shape[1] < image_size[1] and int(y1) + patch.shape[2] < image_size[2]:
+            x_location, y_location = 0, 0
+            
+            applied_patch[:, int(y1) + y_location:int(y1) + y_location + patch.shape[2], int(x1) + x_location:int(x1) + x_location + patch.shape[1]] = patch
+            applied_patch_loc.append((int(x1) + x_location, int(y1) + y_location))
 
     mask = applied_patch.copy()
     mask[mask != 0] = 1.0
