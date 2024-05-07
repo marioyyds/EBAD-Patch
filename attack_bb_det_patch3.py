@@ -15,7 +15,7 @@ import datetime
 
 import numpy as np
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '2'
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 import torch
 from PIL import Image
 from matplotlib import pyplot as plt
@@ -28,11 +28,11 @@ sys.path.insert(0, str(mmdet_root))
 from utils_mmdet import vis_bbox, VOC_BBOX_LABEL_NAMES, COCO_BBOX_LABEL_NAMES, voc2coco, get_det, is_success, get_iou
 from utils_mmdet import model_train
 
-target_label_set = set([0, 2, 3, 9, 11])
+target_label_set = set([0, 10, 2, 5, 6, 7, 1, 3, 9, 11])
 
 def patch_initialization(image_size=(3, 224, 224), noise_percentage=0.06):
     # mask_length = int((noise_percentage * image_size[1] * image_size[2])**0.5)
-    mask_length = 20
+    mask_length = 40
     patch = np.random.rand(image_size[0], mask_length, mask_length)
     return patch
 
@@ -126,7 +126,7 @@ def PM_tensor_weight_balancing(im, adv, target, w, ensemble, eps, n_iters, alpha
             # add mask to attack only specify objection area/range
             # mask = torch.from_numpy(generate_mask(pert.shape[-2:], bboxes_tgt)).to("cuda")
             mask = torch.from_numpy(generate_mask(pert.shape[-2:], bboxes_tgt)).to(pert.device)
-            # pert = pert.masked_fill(mask.bool(), 0)
+            pert = pert.masked_fill(mask.bool(), 0)
 
             adv = (im + pert).clip(0, 255) 
             adv_list.append(adv)
@@ -164,7 +164,7 @@ def PM_tensor_weight_balancing(im, adv, target, w, ensemble, eps, n_iters, alpha
     patch = patch_tmp / len(applied_patch_loc)
     patch = patch.astype(np.uint8)
     # TODO
-    patch_adv = mask_im_np + applied_patch.transpose(1, 2, 0).astype(np.uint8)
+    patch_adv = mask_im_np + applied_patch.transpose(1, 2, 0).astype(np.uint8) * np.logical_not(patch_mask)
     patch_adv_mask = applied_patch.transpose(1, 2, 0).astype(np.uint8) * np.logical_not(patch_mask)
     return adv_list, LOSS, patch, patch_adv.astype(np.uint8), patch_mask, patch_adv_mask
 
@@ -332,7 +332,7 @@ def patch_save_det_to_fig(im_np, adv_np, LOSS, target_clean, all_models, im_id, 
 
 def main():
     parser = argparse.ArgumentParser(description="generate perturbations")
-    parser.add_argument("--eps", type=int, default=20, help="perturbation level: 10,20,30,40,50")
+    parser.add_argument("--eps", type=int, default=50, help="perturbation level: 10,20,30,40,50")
     parser.add_argument("--iters", type=int, default=20, help="number of inner iterations: 5,6,10,20...")
     # parser.add_argument("--gpu", type=int, default=0, help="GPU ID: 0,1")
     parser.add_argument("--root", type=str, default='result', help="the folder name of result")
@@ -460,9 +460,11 @@ def main():
 
         # # for target_class in target_pool:
         # target_class = int(target_pool[0])
+        indices_to_remove = np.any(det[:, 4:5] == np.array(list(target_label_set)), axis=1)
+        det = det[indices_to_remove]
 
         target = det.copy()
-        attack_goal = ""
+        attack_goal = "attack all objects to potted plant"
         for victim_idx in range(0, len(det)):
             # randomly select a victim
             # victim_idx = random.randint(0,len(det)-1)
@@ -471,14 +473,15 @@ def main():
             # randomly select a target
             select_n = 1 # for each victim object, randomly select 5 target objects
             # target_pool = list(set(range(n_labels)) - all_categories)
-            target_pool = list(target_label_set - set([victim_class]))
-            target_pool = np.random.permutation(target_pool)[:select_n]
+            # target_pool = list(target_label_set - set([victim_class]))
+            # target_pool = np.random.permutation(target_pool)[:select_n]
 
             # for target_class in target_pool:
-            target_class = int(target_pool[0])
+            # target_class = int(target_pool[0])
+            target_class = 58  # potted plant
 
             # basic information of attack
-            attack_goal += f"{label_names[victim_class]} to {label_names[target_class]}\n"
+            # attack_goal += f"{label_names[victim_class]} to {label_names[target_class]}\n"
             target[victim_idx, 4] = target_class
 
 
