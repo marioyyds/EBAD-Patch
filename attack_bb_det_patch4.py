@@ -55,8 +55,8 @@ def patch_mask_generation(patch=None, image_size=(3, 224, 224), bounding_boxes =
             
             applied_patch[:, int(y1) + y_location:int(y1) + y_location + patch.shape[2], int(x1) + x_location:int(x1) + x_location + patch.shape[1]] = patch
             applied_patch_loc.append((int(x1) + x_location, int(y1) + y_location))
-        elif int(x1) + patch.shape[1] < image_size[1] and int(y1) + patch.shape[2] < image_size[2]:
-            x_location, y_location = 0, 0
+        elif int(x1) + x_width/2 + patch.shape[1] < image_size[1] and int(y1) + y_width/2 + patch.shape[2] < image_size[2]:
+            x_location, y_location = int(x_width/2), int(y_width/2)
             
             applied_patch[:, int(y1) + y_location:int(y1) + y_location + patch.shape[2], int(x1) + x_location:int(x1) + x_location + patch.shape[1]] = patch
             applied_patch_loc.append((int(x1) + x_location, int(y1) + y_location))
@@ -348,7 +348,7 @@ def main():
     # parser.add_argument("-untargeted", action='store_true', help="run untargeted attack")
     # parser.add_argument("--loss_name", type=str, default='cw', help="the name of the loss")
     parser.add_argument("--lr", type=float, default=1e-2, help="learning rate of w")
-    parser.add_argument("--iterw", type=int, default=5, help="iterations of updating w")
+    parser.add_argument("--iterw", type=int, default=10, help="iterations of updating w")
     parser.add_argument("--dataset", type=str, default='coco', help="model dataset 'voc' or 'coco'. This will change the output range of detectors.")
     parser.add_argument("-single", action='store_true', help="only care about one obj")
     parser.add_argument("-no_balancing", action='store_true', help="do not balance weights at beginning")
@@ -428,7 +428,8 @@ def main():
     n_obj_list = []
 
     test_image_ids = JSON.load(open(f"data/test_phase2/output.json"))
-    patch = patch_initialization((3, 1912, 1028))
+    # patch = patch_initialization((3, 1912, 1028))
+    patch = np.load("patch/patch0.npy")
     for im_idx, im_id in tqdm(enumerate(test_image_ids[:99])):
     # for im_idx, im_id in [(1, "000004")]:
         im_root = Path("data/test_phase2")
