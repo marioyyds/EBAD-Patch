@@ -15,7 +15,7 @@ import datetime
 
 import numpy as np
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 import torch
 from PIL import Image
 from matplotlib import pyplot as plt
@@ -353,7 +353,7 @@ def main():
     # parser.add_argument("-untargeted", action='store_true', help="run untargeted attack")
     # parser.add_argument("--loss_name", type=str, default='cw', help="the name of the loss")
     parser.add_argument("--lr", type=float, default=1e-2, help="learning rate of w")
-    parser.add_argument("--iterw", type=int, default=5, help="iterations of updating w")
+    parser.add_argument("--iterw", type=int, default=10, help="iterations of updating w")
     parser.add_argument("--dataset", type=str, default='coco', help="model dataset 'voc' or 'coco'. This will change the output range of detectors.")
     parser.add_argument("-single", action='store_true', help="only care about one obj")
     parser.add_argument("-no_balancing", action='store_true', help="do not balance weights at beginning")
@@ -489,7 +489,8 @@ def main():
 
             # for target_class in target_pool:
             # target_class = int(target_pool[0])
-            target_class = 58  # potted plant
+            # target_class = 58  # potted plant
+            target_class = 16  # dog
 
             # basic information of attack
             # attack_goal += f"{label_names[victim_class]} to {label_names[target_class]}\n"
