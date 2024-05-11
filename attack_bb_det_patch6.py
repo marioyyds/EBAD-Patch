@@ -48,11 +48,16 @@ def patch_mask_generation(patch=None, image_size=(3, 224, 224), bounding_boxes =
         x1, y1, x2, y2 = box
         x_width = int(x2) - int(x1)
         y_width = int(y2) - int(y1)
-        if patch.shape[1] < x_width*0.75 and patch.shape[2] < y_width*0.75:
-            # for mask_num in range(2):
-            #     # patch location
+        if patch.shape[1]*patch.shape[2]*6 < x_width*y_width:
+            for mask_num in range(2):
+                # patch location
+                x_location, y_location = np.random.randint(low=0, high=x_width-patch.shape[1]), np.random.randint(low=0, high=y_width-patch.shape[2])
+                
+                applied_patch[:, int(y1) + y_location:int(y1) + y_location + patch.shape[2], int(x1) + x_location:int(x1) + x_location + patch.shape[1]] = patch
+                applied_patch_loc.append((int(x1) + x_location, int(y1) + y_location))
+        elif patch.shape[1] < x_width*0.75 and patch.shape[2] < y_width*0.75:
             x_location, y_location = np.random.randint(low=0, high=x_width-patch.shape[1]), np.random.randint(low=0, high=y_width-patch.shape[2])
-            
+                
             applied_patch[:, int(y1) + y_location:int(y1) + y_location + patch.shape[2], int(x1) + x_location:int(x1) + x_location + patch.shape[1]] = patch
             applied_patch_loc.append((int(x1) + x_location, int(y1) + y_location))
         elif int(x1) + x_width/2 + patch.shape[1] < image_size[1] and int(y1) + y_width/2 + patch.shape[2] < image_size[2]:
@@ -348,7 +353,7 @@ def main():
     # parser.add_argument("-untargeted", action='store_true', help="run untargeted attack")
     # parser.add_argument("--loss_name", type=str, default='cw', help="the name of the loss")
     parser.add_argument("--lr", type=float, default=1e-2, help="learning rate of w")
-    parser.add_argument("--iterw", type=int, default=10, help="iterations of updating w")
+    parser.add_argument("--iterw", type=int, default=5, help="iterations of updating w")
     parser.add_argument("--dataset", type=str, default='coco', help="model dataset 'voc' or 'coco'. This will change the output range of detectors.")
     parser.add_argument("-single", action='store_true', help="only care about one obj")
     parser.add_argument("-no_balancing", action='store_true', help="do not balance weights at beginning")
