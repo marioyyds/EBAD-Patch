@@ -121,7 +121,7 @@ test_image_ids = JSON.load(open(f"data/test_phase2/output.json"))
 
 for img in test_image_ids:
     im_path = f"/data/hdd3/duhao/code/EBAD1/data/29/{img}.jpg"
-    ori_im_path = f"/data/hdd3/duhao/code/EBAD1/data/29/{img}.jpg"
+    ori_im_path = f"/data/hdd3/duhao/code/EBAD1/data/test_phase2/{img}.jpg"
     adv_path = f"/data/hdd3/duhao/code/EBAD1/mask_new_all_4/{img}.jpg"
     im_np = np.array(Image.open(im_path).convert('RGB'))
     ori_im_np = np.array(Image.open(ori_im_path).convert('RGB'))
