@@ -525,7 +525,7 @@ def main():
         np.save(target_root/f"{im_id}_patch", patch)
         n_query = 0
         loss_bb, success_list = save_det_to_fig(im_np, adv_np, LOSS, target_clean, all_models, im_id, im_idx, attack_goal, log_root, dataset, n_query)
-        patch_save_det_to_fig(im_np, patch_adv, LOSS, target_clean, all_models, im_id, im_idx, attack_goal, log_root, dataset, n_query)
+        # patch_save_det_to_fig(im_np, patch_adv, LOSS, target_clean, all_models, im_id, im_idx, attack_goal, log_root, dataset, n_query)
         dict_k_valid_id_v_success_list[im_id].append(success_list)
 
         # save adv in folder
@@ -559,7 +559,7 @@ def main():
                 adv_np_plus, LOSS_plus, patch, patch_adv = PM_tensor_weight_balancing_np(im_np, target, w_np_temp_plus, ensemble, eps, n_iters, alpha=alpha, dataset=dataset, adv_init=adv_np, patch=patch)
                 np.save(target_root/f"{im_id}_patch", patch)
                 loss_bb_plus, success_list = save_det_to_fig(im_np, adv_np_plus, LOSS_plus, target_clean, all_models, im_id, im_idx, attack_goal, log_root, dataset, n_query)
-                patch_save_det_to_fig(im_np, patch_adv, LOSS, target_clean, all_models, im_id, im_idx, attack_goal, log_root, dataset, n_query)
+                # patch_save_det_to_fig(im_np, patch_adv, LOSS, target_clean, all_models, im_id, im_idx, attack_goal, log_root, dataset, n_query)
                 dict_k_valid_id_v_success_list[im_id].append(success_list)
 
                 n_query += 1
@@ -590,7 +590,7 @@ def main():
                 adv_np_minus, LOSS_minus, patch, patch_adv = PM_tensor_weight_balancing_np(im_np, target, w_np_temp_minus, ensemble, eps, n_iters, alpha=alpha, dataset=dataset, adv_init=adv_np, patch=patch)
                 np.save(target_root/f"{im_id}_patch", patch)
                 loss_bb_minus, success_list = save_det_to_fig(im_np, adv_np_minus, LOSS_minus, target_clean, all_models, im_id, im_idx, attack_goal, log_root, dataset, n_query)
-                patch_save_det_to_fig(im_np, patch_adv, LOSS, target_clean, all_models, im_id, im_idx, attack_goal, log_root, dataset, n_query)
+                # patch_save_det_to_fig(im_np, patch_adv, LOSS, target_clean, all_models, im_id, im_idx, attack_goal, log_root, dataset, n_query)
                 dict_k_valid_id_v_success_list[im_id].append(success_list)
 
                 n_query += 1

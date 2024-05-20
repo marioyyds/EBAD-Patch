@@ -5,6 +5,11 @@ nohup.out
 mask_new_all
 mask_new_all_2
 mask_new_all_3
+mask_new_all_4
 noise_all
 data/CVPR_Adversarial/*.jpg
 results_voc
+data/score_22
+data/22_repatch1
+data/26_ensemble_patch
+data/29

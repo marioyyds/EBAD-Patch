@@ -78,7 +78,7 @@ def generate_noise(image_shape, bounding_boxes):
         # break
     return noise
 
-model = model_train(model_name="DETR", dataset="coco")
+model = model_train(model_name="CO-DETR", dataset="coco")
 
 test_image_ids = JSON.load(open(f"data/test_phase2/output.json"))
 

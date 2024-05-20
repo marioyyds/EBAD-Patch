@@ -15,7 +15,7 @@ import datetime
 
 import numpy as np
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '2'
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 import torch
 from PIL import Image
 from matplotlib import pyplot as plt
@@ -429,8 +429,8 @@ def main():
 
     test_image_ids = JSON.load(open(f"data/test_phase2/output.json"))
     # patch = patch_initialization((3, 1912, 1028))
-    patch = np.load("patch/patch0.npy")
-    for im_idx, im_id in tqdm(enumerate(test_image_ids[:99])):
+    patch = np.load("patch/patch1.npy")
+    for im_idx, im_id in tqdm(enumerate(test_image_ids[:100])):
     # for im_idx, im_id in [(1, "000004")]:
         im_root = Path("data/test_phase2")
         im_path = im_root / f"{im_id}.jpg"

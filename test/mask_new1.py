@@ -1,7 +1,7 @@
 import sys 
 import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/../")
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 import torch
 import numpy as np
 from utils_mmdet import model_train
@@ -11,7 +11,7 @@ import json as JSON
 
 # target_label_set = set([0, 2, 3, 9, 11])
 # target_label_set = set([0, 10, 2, 5, 6, 7, 1, 3])
-target_label_set = set([0, 10, 2, 5, 6, 7, 1, 3, 9, 11])
+target_label_set = set([9])
 
 def patch_initialization(x_width, y_width):
     # patch = np.random.randint(0, 256, size=(3, x_width, y_width), dtype=np.uint8)

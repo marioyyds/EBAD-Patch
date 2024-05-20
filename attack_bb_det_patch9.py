@@ -15,7 +15,7 @@ import datetime
 
 import numpy as np
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 import torch
 from PIL import Image
 from matplotlib import pyplot as plt
@@ -307,7 +307,7 @@ def main():
     # parser.add_argument("-untargeted", action='store_true', help="run untargeted attack")
     # parser.add_argument("--loss_name", type=str, default='cw', help="the name of the loss")
     parser.add_argument("--lr", type=float, default=1e-2, help="learning rate of w")
-    parser.add_argument("--iterw", type=int, default=5, help="iterations of updating w")
+    parser.add_argument("--iterw", type=int, default=10, help="iterations of updating w")
     parser.add_argument("--dataset", type=str, default='coco', help="model dataset 'voc' or 'coco'. This will change the output range of detectors.")
     parser.add_argument("-single", action='store_true', help="only care about one obj")
     parser.add_argument("-no_balancing", action='store_true', help="do not balance weights at beginning")
@@ -401,9 +401,9 @@ def main():
         # indices_to_remove = np.any(det[:, 4:5] == np.array(list(target_label_set)), axis=1)
         # det = det[indices_to_remove]
 
-        bboxes, labels, scores = det[:,:4], det[:,4], det[:,5]
         indices_to_remove = np.any(det[:, 4:5] == np.array(list(target_label_set)), axis=1)
         det = det[indices_to_remove]
+        bboxes, labels, scores = det[:,:4], det[:,4], det[:,5]
         applied_patch, applied_patch_loc, patch_mask = patch_mask_generation(patch, im_np.transpose(2, 0, 1).shape, bboxes)
         print(f"n_objects: {len(det)}")
         n_obj_list.append(len(det))

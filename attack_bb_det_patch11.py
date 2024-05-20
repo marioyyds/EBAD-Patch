@@ -15,7 +15,7 @@ import datetime
 
 import numpy as np
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 import torch
 from PIL import Image
 from matplotlib import pyplot as plt
@@ -28,6 +28,7 @@ sys.path.insert(0, str(mmdet_root))
 from utils_mmdet import vis_bbox, VOC_BBOX_LABEL_NAMES, COCO_BBOX_LABEL_NAMES, voc2coco, get_det, is_success, get_iou
 from utils_mmdet import model_train
 
+# target_label_set = set([9])
 target_label_set = set([0, 10, 2, 5, 6, 7, 1, 3, 9, 11])
 
 def patch_initialization(x_width, y_width):
@@ -39,12 +40,12 @@ def patch_mask_generation(patch=None, image_size=(3, 224, 224), bounding_boxes =
     applied_patch_loc = []
 
     for box in bounding_boxes:
-        for patch_num in range(2):
+        for patch_num in range(1):
             x1, y1, x2, y2 = box
             x_width = int(x2) - int(x1)
             y_width = int(y2) - int(y1)
-            mask_x_width = int(x_width/3)
-            mask_y_width = int(y_width/3)
+            mask_x_width = int(x_width/5)
+            mask_y_width = int(y_width/5)
             patch = patch_initialization(mask_y_width, mask_x_width)
 
             x_location, y_location = np.random.randint(low=0, high=x_width-patch.shape[2]), np.random.randint(low=0, high=y_width-patch.shape[1])
@@ -91,48 +92,16 @@ def PM_tensor_weight_balancing(im, adv, target, w, ensemble, eps, n_iters, alpha
 
     im_np = im.squeeze().cpu().numpy().transpose(1, 2, 0)
     adv_list = []
-    pert = adv - im
     LOSS = defaultdict(list) # loss lists for different models
 
-    for i in range(n_iters):
-        pert.requires_grad = True
-        loss_list = []
-        loss_list_np = []
-        for model in ensemble:
-            loss = model.loss(im_np, pert, bboxes_tgt, labels_tgt)
-            loss_list.append(loss)
-            loss_list_np.append(loss.item())
-            LOSS[model.model_name].append(loss.item())
-        
-        # if balance the weights at every iteration
-        if weight_balancing:
-            w_inv = 1/np.array(loss_list_np)
-            w = w_inv / w_inv.sum()
-
-        # print(f"w: {w}")
-        loss_ens = sum(w[i]*loss_list[i] for i in range(len(ensemble)))
-        loss_ens.backward()
-        with torch.no_grad():
-            pert = pert - alpha*torch.sign(pert.grad)
-            pert = pert.clamp(min=-eps, max=eps)
-            LOSS['ens'].append(loss_ens.item())
-            
-            # need to check whether needs to mask
-            
-            # add mask to attack only specify objection area/range
-            # mask = torch.from_numpy(generate_mask(pert.shape[-2:], bboxes_tgt)).to("cuda")
-            mask = torch.from_numpy(generate_mask(pert.shape[-2:], bboxes_tgt)).to(pert.device)
-            pert = pert.masked_fill(mask.bool(), 0)
-
-            adv = (im + pert).clip(0, 255) 
-            adv_list.append(adv)
+    adv_list.append(im_np)
 
 
     # im_np
 
     applied_patch = torch.from_numpy(applied_patch).unsqueeze(0).float()
     # patch_mask = patch_mask.transpose(1, 2, 0)
-    mask_im_np = adv_list[-1].squeeze(0).cpu().numpy().transpose(1, 2, 0)
+    mask_im_np = adv_list[-1]
     mask_im_np = mask_im_np * patch_mask.transpose(1, 2, 0)
     for i in range(n_iters):
         applied_patch.requires_grad = True
@@ -178,7 +147,7 @@ def PM_tensor_weight_balancing_np(im_np, target, w_np, ensemble, eps, n_iters, a
 
     # w = torch.from_numpy(w_np).float().to(device)
     adv_list, LOSS, patch, patch_adv, patch_mask, patch_adv_mask, applied_patch, patch_mask= PM_tensor_weight_balancing(im, adv, target, w_np, ensemble, eps, n_iters, alpha, dataset, weight_balancing, patch, applied_patch=applied_patch, patch_mask=patch_mask)
-    adv_np = adv_list[-1].squeeze().cpu().numpy().transpose(1, 2, 0).astype(np.uint8)
+    adv_np = adv_list[-1].astype(np.uint8)
     # TODO
     adv_np = adv_np * patch_mask.transpose(1, 2, 0) + patch_adv_mask
     return adv_np, LOSS, patch, patch_adv, applied_patch, patch_mask
@@ -204,7 +173,7 @@ def get_bb_loss(detections, target_clean, LOSS):
 
     # if it disappears
     if max_iou < 0.3:
-        bb_loss = LOSS['ens'][-1]
+        bb_loss = LOSS['CO-DETR2'][-1]
 
     return bb_loss
 
@@ -423,12 +392,16 @@ def main():
     patch = np.load("patch/patch1.npy")
     for im_idx, im_id in tqdm(enumerate(test_image_ids[:100])):
     # for im_idx, im_id in [(1, "000004")]:
-        im_root = Path("data/test_phase2")
+        im_root = Path("data/26_ensemble_patch")
         im_path = im_root / f"{im_id}.jpg"
         im_np = np.array(Image.open(im_path).convert('RGB'))
+
+        im_root_ori = Path("data/test_phase2")
+        im_path_ori = im_root_ori / f"{im_id}.jpg"
+        im_np_ori = np.array(Image.open(im_path_ori).convert('RGB'))
         
         # get detection on clean images and determine target class
-        det = model_victim.det(im_np)
+        det = model_victim.det(im_np_ori)
 
         # indices_to_remove = np.any(det[:, 4:5] == np.array(list(target_label_set)), axis=1)
         # det = det[indices_to_remove]

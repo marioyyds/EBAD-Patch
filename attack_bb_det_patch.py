@@ -15,7 +15,7 @@ import datetime
 
 import numpy as np
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '2'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 import torch
 from PIL import Image
 from matplotlib import pyplot as plt
@@ -332,7 +332,7 @@ def patch_save_det_to_fig(im_np, adv_np, LOSS, target_clean, all_models, im_id, 
 
 def main():
     parser = argparse.ArgumentParser(description="generate perturbations")
-    parser.add_argument("--eps", type=int, default=50, help="perturbation level: 10,20,30,40,50")
+    parser.add_argument("--eps", type=int, default=30, help="perturbation level: 10,20,30,40,50")
     parser.add_argument("--iters", type=int, default=20, help="number of inner iterations: 5,6,10,20...")
     # parser.add_argument("--gpu", type=int, default=0, help="GPU ID: 0,1")
     parser.add_argument("--root", type=str, default='result', help="the folder name of result")
