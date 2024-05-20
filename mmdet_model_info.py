@@ -41,7 +41,12 @@ model_info = {
         'config_file': 'configs/sparse_rcnn/sparse-rcnn_r101_fpn_300-proposals_crop-ms-480-800-3x_coco.py',
         'checkpoint_file': 'checkpoints/sparse_rcnn_r101_fpn_300_proposals_crop_mstrain_480-800_3x_coco_20201223_023452-c23c3564.pth',
         'download_link': 'https://download.openmmlab.com/mmdetection/v2.0/sparse_rcnn/sparse_rcnn_r101_fpn_300_proposals_crop_mstrain_480-800_3x_coco/sparse_rcnn_r101_fpn_300_proposals_crop_mstrain_480-800_3x_coco_20201223_023452-c23c3564.pth'
-    }
+    },
+    'CO-DETR2': {
+        'config_file': 'projects/CO-DETR/configs/codino/co_dino_5scale_r50_lsj_8xb2_3x_coco.py',
+        'checkpoint_file': 'checkpoints/co_dino_5scale_lsj_r50_3x_coco-fe5a6829.pth',
+        'download_link': 'https://download.openmmlab.com/mmdetection/v3.0/codetr/co_dino_5scale_lsj_r50_3x_coco-fe5a6829.pth'
+    },
 }
 
 

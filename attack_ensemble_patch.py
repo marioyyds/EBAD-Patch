@@ -1,8 +1,3 @@
-"""
-    Attack object detectors in a blackbox setting
-    design blackbox loss
-"""
-# https://github.com/open-mmlab/mmcv#installation
 import sys
 import argparse
 from pathlib import Path
@@ -15,7 +10,7 @@ import datetime
 
 import numpy as np
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 import torch
 from PIL import Image
 from matplotlib import pyplot as plt
@@ -31,7 +26,7 @@ from utils_mmdet import model_train
 target_label_set = set([0, 10, 2, 5, 6, 7, 1, 3, 9, 11])
 
 def patch_initialization(image_size=(3, 224, 224), noise_percentage=0.06):
-    # mask_length = int((noise_percentage * image_size[1] * image_size[2])**0.5)
+
     mask_length = 40
     patch = np.random.rand(image_size[0], mask_length, mask_length)
     return patch
@@ -40,25 +35,20 @@ def patch_mask_generation(patch=None, image_size=(3, 224, 224), bounding_boxes =
     applied_patch = np.zeros(image_size)
     applied_patch_loc = []
 
-    # rotation_angle = np.random.choice(4)
-    # for i in range(patch.shape[0]):
-    #     patch[i] = np.rot90(patch[i], rotation_angle)  # The actual rotation angle is rotation_angle * 90
-    
     for box in bounding_boxes:
         x1, y1, x2, y2 = box
         x_width = int(x2) - int(x1)
         y_width = int(y2) - int(y1)
 
-        if x_width > patch.shape[1] and y_width > patch.shape[2]:
-            for mask_num in range(3):
-                # for mask_num in range(2):
-                #     # patch location
+        if patch.shape[1] < x_width*0.75 and patch.shape[2] < y_width*0.75:
+            for mask_num in range(2):
+                # patch location
                 x_location, y_location = np.random.randint(low=0, high=x_width-patch.shape[1]), np.random.randint(low=0, high=y_width-patch.shape[2])
                 
                 applied_patch[:, int(y1) + y_location:int(y1) + y_location + patch.shape[2], int(x1) + x_location:int(x1) + x_location + patch.shape[1]] = patch
                 applied_patch_loc.append((int(x1) + x_location, int(y1) + y_location))
-        elif int(x1) + patch.shape[1] < image_size[1] and int(y1) + patch.shape[2] < image_size[2]:
-            x_location, y_location = 0, 0
+        elif int(x1) + x_width/2 + patch.shape[1] < image_size[1] and int(y1) + y_width/2 + patch.shape[2] < image_size[2]:
+            x_location, y_location = int(x_width/2), int(y_width/2)
             
             applied_patch[:, int(y1) + y_location:int(y1) + y_location + patch.shape[2], int(x1) + x_location:int(x1) + x_location + patch.shape[1]] = patch
             applied_patch_loc.append((int(x1) + x_location, int(y1) + y_location))
@@ -104,6 +94,10 @@ def PM_tensor_weight_balancing(im, adv, target, w, ensemble, eps, n_iters, alpha
     adv_list = []
     pert = adv - im
     LOSS = defaultdict(list) # loss lists for different models
+    # im_np
+    applied_patch, applied_patch_loc, patch_mask = patch_mask_generation(patch, im.shape[1:], bboxes_tgt)
+    applied_patch = torch.from_numpy(applied_patch).unsqueeze(0).float()
+    patch_mask = patch_mask.transpose(1, 2, 0)
 
     for i in range(n_iters):
         pert.requires_grad = True
@@ -127,41 +121,33 @@ def PM_tensor_weight_balancing(im, adv, target, w, ensemble, eps, n_iters, alpha
             pert = pert - alpha*torch.sign(pert.grad)
             pert = pert.clamp(min=-eps, max=eps)
             LOSS['ens'].append(loss_ens.item())
-            
-            # need to check whether needs to mask
-            
+      
             # add mask to attack only specify objection area/range
-            # mask = torch.from_numpy(generate_mask(pert.shape[-2:], bboxes_tgt)).to("cuda")
             mask = torch.from_numpy(generate_mask(pert.shape[-2:], bboxes_tgt)).to(pert.device)
             pert = pert.masked_fill(mask.bool(), 0)
 
             adv = (im + pert).clip(0, 255) 
             adv_list.append(adv)
 
-
-    # im_np
-    applied_patch, applied_patch_loc, patch_mask = patch_mask_generation(patch, im.shape[1:], bboxes_tgt)
-    applied_patch = torch.from_numpy(applied_patch).unsqueeze(0).float()
-    patch_mask = patch_mask.transpose(1, 2, 0)
-    mask_im_np = im_np.copy()
-    mask_im_np = mask_im_np * patch_mask
-    for i in range(n_iters):
         applied_patch.requires_grad = True
-        loss_list = []
-        loss_list_np = []
+        mask_im_np = adv_list[-1].squeeze().cpu().numpy().transpose(1, 2, 0).astype(np.uint8)
+        mask_im_np = mask_im_np * patch_mask
+        patch_loss_list = []
+        patch_loss_list_np = []
         for model in ensemble:
             loss = model.loss(mask_im_np, applied_patch, bboxes_tgt, labels_tgt)
-            loss_list.append(loss)
-            loss_list_np.append(loss.item())
+            patch_loss_list.append(loss)
+            patch_loss_list_np.append(loss.item())
             LOSS[model.model_name].append(loss.item())
         
-        loss_ens = sum(w[i]*loss_list[i] for i in range(len(ensemble)))
-        loss_ens.backward()
+        patch_loss_ens = sum(w[i]*patch_loss_list[i] for i in range(len(ensemble)))
+        patch_loss_ens.backward()
 
         with torch.no_grad():
             applied_patch = applied_patch - 5*torch.sign(applied_patch.grad)
             applied_patch = applied_patch.clamp(min=-eps, max=eps)
             applied_patch = applied_patch.masked_fill(torch.from_numpy(patch_mask.transpose(2, 0, 1)).unsqueeze(0).bool(), 0)
+
     applied_patch = applied_patch.squeeze().cpu().numpy()
     patch_tmp = np.zeros(patch.shape).astype(np.float64)
     for loc in applied_patch_loc:
@@ -171,9 +157,8 @@ def PM_tensor_weight_balancing(im, adv, target, w, ensemble, eps, n_iters, alpha
     patch = patch_tmp / len(applied_patch_loc)
     patch = patch.astype(np.uint8)
     # TODO
-    patch_adv = mask_im_np + applied_patch.transpose(1, 2, 0).astype(np.uint8) * np.logical_not(patch_mask)
     patch_adv_mask = applied_patch.transpose(1, 2, 0).astype(np.uint8) * np.logical_not(patch_mask)
-    return adv_list, LOSS, patch, patch_adv.astype(np.uint8), patch_mask, patch_adv_mask
+    return adv_list, LOSS, patch, patch_mask, patch_adv_mask
 
 
 def PM_tensor_weight_balancing_np(im_np, target, w_np, ensemble, eps, n_iters, alpha, dataset='voc', weight_balancing=False, adv_init=None, patch = None):
@@ -188,11 +173,11 @@ def PM_tensor_weight_balancing_np(im_np, target, w_np, ensemble, eps, n_iters, a
         adv = torch.from_numpy(adv_init).permute(2,0,1).unsqueeze(0).float().to(device)
 
     # w = torch.from_numpy(w_np).float().to(device)
-    adv_list, LOSS, patch, patch_adv, patch_mask, patch_adv_mask= PM_tensor_weight_balancing(im, adv, target, w_np, ensemble, eps, n_iters, alpha, dataset, weight_balancing, patch)
+    adv_list, LOSS, patch, patch_mask, patch_adv_mask= PM_tensor_weight_balancing(im, adv, target, w_np, ensemble, eps, n_iters, alpha, dataset, weight_balancing, patch)
     adv_np = adv_list[-1].squeeze().cpu().numpy().transpose(1, 2, 0).astype(np.uint8)
     # TODO
     adv_np = adv_np * patch_mask + patch_adv_mask
-    return adv_np, LOSS, patch, patch_adv
+    return adv_np, LOSS, patch
 
 
 def get_bb_loss(detections, target_clean, LOSS):
@@ -241,8 +226,8 @@ def save_det_to_fig(im_np, adv_np, LOSS, target_clean, all_models, im_id, im_idx
     for model_idx, model in enumerate(all_models):
         det_adv = model.det(im_np)
 
-        indices_to_remove = np.any(det_adv[:, 4:5] == np.array(list(target_label_set)), axis=1)
-        det_adv = det_adv[indices_to_remove]
+        indices_to_keep = np.any(det_adv[:, 4:5] == np.array(list(target_label_set)), axis=1)
+        det_adv = det_adv[indices_to_keep]
 
         bboxes, labels, scores = det_adv[:,:4], det_adv[:,4], det_adv[:,5]
         vis_bbox(im_np, bboxes, labels, scores, ax=ax[row,model_idx+1], dataset=dataset)
@@ -255,8 +240,8 @@ def save_det_to_fig(im_np, adv_np, LOSS, target_clean, all_models, im_id, im_idx
     for model_idx, model in enumerate(all_models):
         det_adv = model.det(adv_np)
 
-        indices_to_remove = np.any(det_adv[:, 4:5] == np.array(list(target_label_set)), axis=1)
-        det_adv = det_adv[indices_to_remove]
+        indices_to_keep = np.any(det_adv[:, 4:5] == np.array(list(target_label_set)), axis=1)
+        det_adv = det_adv[indices_to_keep]
 
         bboxes, labels, scores = det_adv[:,:4], det_adv[:,4], det_adv[:,5]
         vis_bbox(adv_np, bboxes, labels, scores, ax=ax[row,model_idx+1], dataset=dataset)
@@ -299,8 +284,8 @@ def patch_save_det_to_fig(im_np, adv_np, LOSS, target_clean, all_models, im_id, 
     for model_idx, model in enumerate(all_models):
         det_adv = model.det(im_np)
 
-        indices_to_remove = np.any(det_adv[:, 4:5] == np.array(list(target_label_set)), axis=1)
-        det_adv = det_adv[indices_to_remove]
+        indices_to_keep = np.any(det_adv[:, 4:5] == np.array(list(target_label_set)), axis=1)
+        det_adv = det_adv[indices_to_keep]
 
         bboxes, labels, scores = det_adv[:,:4], det_adv[:,4], det_adv[:,5]
         vis_bbox(im_np, bboxes, labels, scores, ax=ax[row,model_idx+1], dataset=dataset)
@@ -313,8 +298,8 @@ def patch_save_det_to_fig(im_np, adv_np, LOSS, target_clean, all_models, im_id, 
     for model_idx, model in enumerate(all_models):
         det_adv = model.det(adv_np)
 
-        indices_to_remove = np.any(det_adv[:, 4:5] == np.array(list(target_label_set)), axis=1)
-        det_adv = det_adv[indices_to_remove]
+        indices_to_keep = np.any(det_adv[:, 4:5] == np.array(list(target_label_set)), axis=1)
+        det_adv = det_adv[indices_to_keep]
 
         bboxes, labels, scores = det_adv[:,:4], det_adv[:,4], det_adv[:,5]
         vis_bbox(adv_np, bboxes, labels, scores, ax=ax[row,model_idx+1], dataset=dataset)
@@ -350,7 +335,7 @@ def main():
     # parser.add_argument("-untargeted", action='store_true', help="run untargeted attack")
     # parser.add_argument("--loss_name", type=str, default='cw', help="the name of the loss")
     parser.add_argument("--lr", type=float, default=1e-2, help="learning rate of w")
-    parser.add_argument("--iterw", type=int, default=1, help="iterations of updating w")
+    parser.add_argument("--iterw", type=int, default=10, help="iterations of updating w")
     parser.add_argument("--dataset", type=str, default='coco', help="model dataset 'voc' or 'coco'. This will change the output range of detectors.")
     parser.add_argument("-single", action='store_true', help="only care about one obj")
     parser.add_argument("-no_balancing", action='store_true', help="do not balance weights at beginning")
@@ -370,7 +355,7 @@ def main():
     # load surrogate models
     ensemble = []
 
-    models_all = ['Faster R-CNN', 'YOLOv3', 'YOLOX', 'Sparse R-CNN','CO-DETR2', 'DETR', 'DINO']
+    models_all = ['Faster R-CNN', 'YOLOv3', 'YOLOX', 'Sparse R-CNN','CO-DETR2', 'DETR']
     model_list = models_all[:n_wb]
     if n_wb == 1:
         model_list = [args.surrogate]
@@ -385,7 +370,7 @@ def main():
         victim_name = 'Deformable DETR'
 
     model_victim = model_train(model_name=victim_name, dataset=dataset)
-    all_model_names = model_list + [victim_name]
+
     all_models = ensemble + [model_victim]
 
     # create folders
@@ -414,37 +399,28 @@ def main():
     target_root = exp_root / 'targets'
     target_root.mkdir(parents=True, exist_ok=True)
 
-    test_image_ids = JSON.load(open(f"data/{dataset}_2to6_objects.json"))
-    data_root = Path("/data/SalmanAsif/")
     if dataset == 'voc':
-        im_root = data_root / "VOC/VOC2007/JPEGImages/"
-        n_labels = 20
         label_names = VOC_BBOX_LABEL_NAMES
     else:
-        im_root = data_root / "COCO/val2017/"
-        n_labels = 80
         label_names = COCO_BBOX_LABEL_NAMES
 
     dict_k_sucess_id_v_query = {} # query counts of successful im_ids
     dict_k_valid_id_v_success_list = {} # lists of success for all mdoels for valid im_ids
     n_obj_list = []
 
-    test_image_ids = JSON.load(open(f"data/test_phase2/output.json"))
+    test_image_ids = JSON.load(open(f"data/test_phase2/phase2.json"))
     # patch = patch_initialization((3, 1912, 1028))
     for im_idx, im_id in tqdm(enumerate(test_image_ids[:100])):
         patch = np.load("patch/patch3.npy")
-    # for im_idx, im_id in [(1, "000004")]:
         im_root = Path("data/test_phase2")
         im_path = im_root / f"{im_id}.jpg"
         im_np = np.array(Image.open(im_path).convert('RGB'))
         
         # get detection on clean images and determine target class
         det = model_victim.det(im_np)
-
-        # indices_to_remove = np.any(det[:, 4:5] == np.array(list(target_label_set)), axis=1)
-        # det = det[indices_to_remove]
-        indices_to_remove = np.any(det[:, 4:5] == np.array(list(target_label_set)), axis=1)
-        det = det[indices_to_remove]
+        # only attack specify objects, car, person, traffic light and etc
+        indices_to_keep = np.any(det[:, 4:5] == np.array(list(target_label_set)), axis=1)
+        det = det[indices_to_keep]
 
         bboxes, labels, scores = det[:,:4], det[:,4], det[:,5]
         print(f"n_objects: {len(det)}")
@@ -457,62 +433,30 @@ def main():
         else:
             dict_k_valid_id_v_success_list[im_id] = []
 
-        # all_categories = set(labels.astype(int))  # all apperaing objects in the scene
-        # # randomly select a victim
-        # victim_idx = random.randint(0,len(det)-1)
-        # victim_class = int(det[victim_idx,4])
-
-        # # randomly select a target
-        # select_n = 1 # for each victim object, randomly select 5 target objects
-        # # target_pool = list(set(range(n_labels)) - all_categories)
-        # target_pool = list(target_label_set - set([victim_class]))
-        # target_pool = np.random.permutation(target_pool)[:select_n]
-
-        # # for target_class in target_pool:
-        # target_class = int(target_pool[0])
-
         target = det.copy()
         attack_goal = "attack all objects to potted plant"
         for victim_idx in range(0, len(det)):
-            # randomly select a victim
-            # victim_idx = random.randint(0,len(det)-1)
+
             victim_class = int(det[victim_idx,4])
 
-            # randomly select a target
-            select_n = 1 # for each victim object, randomly select 5 target objects
-            # target_pool = list(set(range(n_labels)) - all_categories)
-            # target_pool = list(target_label_set - set([victim_class]))
-            # target_pool = np.random.permutation(target_pool)[:select_n]
-
-            # for target_class in target_pool:
-            # target_class = int(target_pool[0])
+            # attack object to potted plant
             target_class = 58  # potted plant
 
-            # basic information of attack
-            # attack_goal += f"{label_names[victim_class]} to {label_names[target_class]}\n"
             target[victim_idx, 4] = target_class
 
-
-        # basic information of attack
-        # attack_goal = f"{label_names[victim_class]} to {label_names[target_class]}"
         info = f"im_idx: {im_idx}, im_id: {im_id}, victim_class: {label_names[victim_class]}, target_class: {label_names[target_class]}\n"
         print(info)
         file = open(exp_root / f'{exp_name}.txt', 'a')
         file.write(f"{info}\n\n")
         file.close()
 
-        # target = det.copy()
-        # only change one label
-        target[victim_idx, 4] = target_class
         # only keep one label
         target_clean = target[victim_idx,:][None]
 
         if args.single: # only care about the target object
             target = target_clean
         # save target to np
-        np.save(target_root/f"{im_id}_target", target)
-
-        # target = np.zeros([0,6]) # for vanishing attack        
+        np.save(target_root/f"{im_id}_target", target)     
         
 
         if args.no_balancing:
@@ -522,22 +466,20 @@ def main():
         else:
             # determine the initial w, via weight balancing
             dummy_w = np.ones(n_wb)
-            _, LOSS, patch, patch_adv = PM_tensor_weight_balancing_np(im_np, target, dummy_w, ensemble, eps, n_iters=1, alpha=alpha, dataset=dataset, patch=patch)
+            _, LOSS, patch = PM_tensor_weight_balancing_np(im_np, target, dummy_w, ensemble, eps, n_iters=1, alpha=alpha, dataset=dataset, patch=patch)
             loss_list_np = [LOSS[name][0] for name in model_list]
             w_inv = 1 / np.array(loss_list_np)
             w_np = w_inv / w_inv.sum()
             print(f"w_np: {w_np}")
         np.save(target_root/f"{im_id}_patch", patch)
 
-        adv_np, LOSS, patch, patch_adv= PM_tensor_weight_balancing_np(im_np, target, w_np, ensemble, eps, n_iters, alpha=alpha, dataset=dataset, patch=patch)
+        adv_np, LOSS, patch = PM_tensor_weight_balancing_np(im_np, target, w_np, ensemble, eps, n_iters, alpha=alpha, dataset=dataset, patch=patch)
         np.save(target_root/f"{im_id}_patch", patch)
         n_query = 0
         loss_bb, success_list = save_det_to_fig(im_np, adv_np, LOSS, target_clean, all_models, im_id, im_idx, attack_goal, log_root, dataset, n_query)
-        # patch_save_det_to_fig(im_np, patch_adv, LOSS, target_clean, all_models, im_id, im_idx, attack_goal, log_root, dataset, n_query)
         dict_k_valid_id_v_success_list[im_id].append(success_list)
 
         # save adv in folder
-        # adv_path = adv_root / f"{im_id}_iter{n_query:02d}.png"
         adv_path = adv_root / f"{im_id}.jpg"
         adv_png = Image.fromarray(adv_np.astype(np.uint8))
         adv_png.save(adv_path)
@@ -564,17 +506,16 @@ def main():
                 ##################################### query plus #####################################
                 w_np_temp_plus = w_np.copy()
                 w_np_temp_plus[idx_w] += lr_w * w_inv[idx_w]
-                adv_np_plus, LOSS_plus, patch, patch_adv = PM_tensor_weight_balancing_np(im_np, target, w_np_temp_plus, ensemble, eps, n_iters, alpha=alpha, dataset=dataset, adv_init=adv_np, patch=patch)
+                adv_np_plus, LOSS_plus, patch = PM_tensor_weight_balancing_np(im_np, target, w_np_temp_plus, ensemble, eps, n_iters, alpha=alpha, dataset=dataset, adv_init=adv_np, patch=patch)
                 np.save(target_root/f"{im_id}_patch", patch)
                 loss_bb_plus, success_list = save_det_to_fig(im_np, adv_np_plus, LOSS_plus, target_clean, all_models, im_id, im_idx, attack_goal, log_root, dataset, n_query)
-                # patch_save_det_to_fig(im_np, patch_adv, LOSS, target_clean, all_models, im_id, im_idx, attack_goal, log_root, dataset, n_query)
+
                 dict_k_valid_id_v_success_list[im_id].append(success_list)
 
                 n_query += 1
                 print(f"iter: {n_query}, {idx_w} +, loss_bb: {loss_bb_plus}")
 
                 # save adv in folder
-                # adv_path = adv_root / f"{im_id}_iter{n_query:02d}.png"
                 adv_path = adv_root / f"{im_id}.jpg"
                 adv_png = Image.fromarray(adv_np_plus.astype(np.uint8))
                 adv_png.save(adv_path)
@@ -595,17 +536,16 @@ def main():
                 ##################################### query minus #####################################
                 w_np_temp_minus = w_np.copy()
                 w_np_temp_minus[idx_w] -= lr_w * w_inv[idx_w]
-                adv_np_minus, LOSS_minus, patch, patch_adv = PM_tensor_weight_balancing_np(im_np, target, w_np_temp_minus, ensemble, eps, n_iters, alpha=alpha, dataset=dataset, adv_init=adv_np, patch=patch)
+                adv_np_minus, LOSS_minus, patch = PM_tensor_weight_balancing_np(im_np, target, w_np_temp_minus, ensemble, eps, n_iters, alpha=alpha, dataset=dataset, adv_init=adv_np, patch=patch)
                 np.save(target_root/f"{im_id}_patch", patch)
                 loss_bb_minus, success_list = save_det_to_fig(im_np, adv_np_minus, LOSS_minus, target_clean, all_models, im_id, im_idx, attack_goal, log_root, dataset, n_query)
-                # patch_save_det_to_fig(im_np, patch_adv, LOSS, target_clean, all_models, im_id, im_idx, attack_goal, log_root, dataset, n_query)
+
                 dict_k_valid_id_v_success_list[im_id].append(success_list)
 
                 n_query += 1
                 print(f"iter: {n_query}, {idx_w} -, loss_bb: {loss_bb_minus}")
 
                 # save adv in folder
-                # adv_path = adv_root / f"{im_id}_iter{n_query:02d}.png"
                 adv_path = adv_root / f"{im_id}.jpg"
                 adv_png = Image.fromarray(adv_np_minus.astype(np.uint8))
                 adv_png.save(adv_path)
