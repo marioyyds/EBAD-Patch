@@ -408,7 +408,7 @@ def main():
     dict_k_valid_id_v_success_list = {} # lists of success for all mdoels for valid im_ids
     n_obj_list = []
 
-    test_image_ids = JSON.load(open(f"data/test_phase2/phase2.json"))
+    test_image_ids = JSON.load(open(f"data/phase2.json"))
     # patch = patch_initialization((3, 1912, 1028))
     for im_idx, im_id in tqdm(enumerate(test_image_ids[:100])):
         patch = np.load("patch/patch3.npy")
