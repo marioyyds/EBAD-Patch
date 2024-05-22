@@ -1,6 +1,6 @@
 # Ensemble-based Blackbox Attacks on Dense Prediction using Patch
 
-This repo is for the Adversarial Attack Competition of CVPR workshop 2024.
+This repo is for the [Adversarial Attack Competition of CVPR workshop 2024](https://challenge.aisafety.org.cn/#/competitionDetail?id=13).
 
 ## Attack multiple blackbox models
 
@@ -42,4 +42,4 @@ Place your datasets to `data` folder as following.
 
 1. run ```python mmdet_model_info.py``` to download pre-trained models from MMCV.
 
-2. run ```python attack_ensemble_patch.py``` to perform attacks on object detection.
+2. run ```python attack_ensemble_patch.py``` to perform attacks.
