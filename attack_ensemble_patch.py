@@ -355,7 +355,7 @@ def main():
     # load surrogate models
     ensemble = []
 
-    models_all = ['Faster R-CNN', 'YOLOv3', 'YOLOX', 'Sparse R-CNN','CO-DETR2', 'DETR']
+    models_all = ['Faster R-CNN', 'YOLOv3', 'YOLOX', 'Sparse R-CNN','CO-DETR', 'DETR']
     model_list = models_all[:n_wb]
     if n_wb == 1:
         model_list = [args.surrogate]
