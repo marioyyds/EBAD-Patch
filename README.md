@@ -1,4 +1,4 @@
-# Ensemble-based Blackbox Attacks on Dense Prediction using Patch
+# Ensemble-based Mixture Attacks on Dense Prediction
 
 This repo is for the [Adversarial Attack Competition of CVPR workshop 2024](https://challenge.aisafety.org.cn/#/competitionDetail?id=13).
 
@@ -13,7 +13,7 @@ Below we generate perturbation to attack objects, such as car, person, stop sign
 * clone repo  
 
 ```shell
-git clone --recursive git@github.com:marioyyds/myEBAD.git
+git clone --recursive git@github.com:marioyyds/EMA.git
 ```
 
 * python==3.8
