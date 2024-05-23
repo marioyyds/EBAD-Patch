@@ -410,181 +410,182 @@ def main():
 
     test_image_ids = JSON.load(open(f"data/phase2.json"))
     # patch = patch_initialization((3, 1912, 1028))
-    for im_idx, im_id in tqdm(enumerate(test_image_ids[:100])):
-        patch = np.load("patch/patch3.npy")
-        im_root = Path("data/test_phase2")
-        im_path = im_root / f"{im_id}.jpg"
-        im_np = np.array(Image.open(im_path).convert('RGB'))
-        
-        # get detection on clean images and determine target class
-        det = model_victim.det(im_np)
-        # only attack specify objects, car, person, traffic light and etc
-        indices_to_keep = np.any(det[:, 4:5] == np.array(list(target_label_set)), axis=1)
-        det = det[indices_to_keep]
-
-        bboxes, labels, scores = det[:,:4], det[:,4], det[:,5]
-        print(f"n_objects: {len(det)}")
-        n_obj_list.append(len(det))
-        if len(det) == 0: # if nothing is detected, skip this image
-            adv_path = adv_root / f"{im_id}.jpg"
-            adv_png = Image.fromarray(im_np.astype(np.uint8))
-            adv_png.save(adv_path)
-            continue
-        else:
-            dict_k_valid_id_v_success_list[im_id] = []
-
-        target = det.copy()
-        attack_goal = "attack all objects to potted plant"
-        for victim_idx in range(0, len(det)):
-
-            victim_class = int(det[victim_idx,4])
-
-            # attack object to potted plant
-            target_class = 58  # potted plant
-
-            target[victim_idx, 4] = target_class
-
-        info = f"im_idx: {im_idx}, im_id: {im_id}, victim_class: {label_names[victim_class]}, target_class: {label_names[target_class]}\n"
-        print(info)
-        file = open(exp_root / f'{exp_name}.txt', 'a')
-        file.write(f"{info}\n\n")
-        file.close()
-
-        # only keep one label
-        target_clean = target[victim_idx,:][None]
-
-        if args.single: # only care about the target object
-            target = target_clean
-        # save target to np
-        np.save(target_root/f"{im_id}_target", target)     
-        
-
-        if args.no_balancing:
-            print(f"no_balancing, using equal weights")
-            w_inv = np.ones(n_wb) 
-            w_np = np.ones(n_wb) / n_wb
-        else:
-            # determine the initial w, via weight balancing
-            dummy_w = np.ones(n_wb)
-            _, LOSS, patch = PM_tensor_weight_balancing_np(im_np, target, dummy_w, ensemble, eps, n_iters=1, alpha=alpha, dataset=dataset, patch=patch)
-            loss_list_np = [LOSS[name][0] for name in model_list]
-            w_inv = 1 / np.array(loss_list_np)
-            w_np = w_inv / w_inv.sum()
-            print(f"w_np: {w_np}")
-        np.save(target_root/f"{im_id}_patch", patch)
-
-        adv_np, LOSS, patch = PM_tensor_weight_balancing_np(im_np, target, w_np, ensemble, eps, n_iters, alpha=alpha, dataset=dataset, patch=patch)
-        np.save(target_root/f"{im_id}_patch", patch)
-        n_query = 0
-        loss_bb, success_list = save_det_to_fig(im_np, adv_np, LOSS, target_clean, all_models, im_id, im_idx, attack_goal, log_root, dataset, n_query)
-        dict_k_valid_id_v_success_list[im_id].append(success_list)
-
-        # save adv in folder
-        adv_path = adv_root / f"{im_id}.jpg"
-        adv_png = Image.fromarray(adv_np.astype(np.uint8))
-        adv_png.save(adv_path)
-
-        # stop whenever successful
-        if success_list[-1]:
-            dict_k_sucess_id_v_query[im_id] = n_query
-            print(f"success! image im idx: {im_idx}")
+    patch = np.load("patch/patch3.npy")
+    for iter in range(3):
+        for im_idx, im_id in tqdm(enumerate(test_image_ids[:100])):
+            im_root = Path("data/test_phase2")
+            im_path = im_root / f"{im_id}.jpg"
+            im_np = np.array(Image.open(im_path).convert('RGB'))
             
-            w_list = []
-            loss_bb_list = [loss_bb]
-            loss_ens_list = LOSS['ens'] # ensemble losses during training
-        else:
+            # get detection on clean images and determine target class
+            det = model_victim.det(im_np)
+            # only attack specify objects, car, person, traffic light and etc
+            indices_to_keep = np.any(det[:, 4:5] == np.array(list(target_label_set)), axis=1)
+            det = det[indices_to_keep]
 
-            n_query += 1
-
-            w_list = []        
-            loss_bb_list = [loss_bb]
-            loss_ens_list = LOSS['ens'] # ensemble losses during training
-
-            idx_w = 0 # idx of wb in W, rotate
-            while n_query < iterw:
-
-                ##################################### query plus #####################################
-                w_np_temp_plus = w_np.copy()
-                w_np_temp_plus[idx_w] += lr_w * w_inv[idx_w]
-                adv_np_plus, LOSS_plus, patch = PM_tensor_weight_balancing_np(im_np, target, w_np_temp_plus, ensemble, eps, n_iters, alpha=alpha, dataset=dataset, adv_init=adv_np, patch=patch)
-                np.save(target_root/f"{im_id}_patch", patch)
-                loss_bb_plus, success_list = save_det_to_fig(im_np, adv_np_plus, LOSS_plus, target_clean, all_models, im_id, im_idx, attack_goal, log_root, dataset, n_query)
-
-                dict_k_valid_id_v_success_list[im_id].append(success_list)
-
-                n_query += 1
-                print(f"iter: {n_query}, {idx_w} +, loss_bb: {loss_bb_plus}")
-
-                # save adv in folder
+            bboxes, labels, scores = det[:,:4], det[:,4], det[:,5]
+            print(f"n_objects: {len(det)}")
+            n_obj_list.append(len(det))
+            if len(det) == 0: # if nothing is detected, skip this image
                 adv_path = adv_root / f"{im_id}.jpg"
-                adv_png = Image.fromarray(adv_np_plus.astype(np.uint8))
+                adv_png = Image.fromarray(im_np.astype(np.uint8))
                 adv_png.save(adv_path)
+                continue
+            else:
+                dict_k_valid_id_v_success_list[im_id] = []
 
-                # stop whenever successful
-                if success_list[-1]:
-                    dict_k_sucess_id_v_query[im_id] = n_query
-                    print(f"success! image im idx: {im_idx}")
-                    loss_bb = loss_bb_plus
-                    loss_ens = LOSS_plus["ens"]
-                    w_np = w_np_temp_plus
-                    adv_np = adv_np_plus
-                    break
+            target = det.copy()
+            attack_goal = "attack all objects to potted plant"
+            for victim_idx in range(0, len(det)):
 
-                #######################################################################################
+                victim_class = int(det[victim_idx,4])
+
+                # attack object to potted plant
+                target_class = 58  # potted plant
+
+                target[victim_idx, 4] = target_class
+
+            info = f"im_idx: {im_idx}, im_id: {im_id}, victim_class: {label_names[victim_class]}, target_class: {label_names[target_class]}\n"
+            print(info)
+            file = open(exp_root / f'{exp_name}.txt', 'a')
+            file.write(f"{info}\n\n")
+            file.close()
+
+            # only keep one label
+            target_clean = target[victim_idx,:][None]
+
+            if args.single: # only care about the target object
+                target = target_clean
+            # save target to np
+            np.save(target_root/f"{im_id}_target", target)     
+            
+
+            if args.no_balancing:
+                print(f"no_balancing, using equal weights")
+                w_inv = np.ones(n_wb) 
+                w_np = np.ones(n_wb) / n_wb
+            else:
+                # determine the initial w, via weight balancing
+                dummy_w = np.ones(n_wb)
+                _, LOSS, patch = PM_tensor_weight_balancing_np(im_np, target, dummy_w, ensemble, eps, n_iters=1, alpha=alpha, dataset=dataset, patch=patch)
+                loss_list_np = [LOSS[name][0] for name in model_list]
+                w_inv = 1 / np.array(loss_list_np)
+                w_np = w_inv / w_inv.sum()
+                print(f"w_np: {w_np}")
+            np.save(target_root/f"{im_id}_patch", patch)
+
+            adv_np, LOSS, patch = PM_tensor_weight_balancing_np(im_np, target, w_np, ensemble, eps, n_iters, alpha=alpha, dataset=dataset, patch=patch)
+            np.save(target_root/f"{im_id}_patch", patch)
+            n_query = 0
+            loss_bb, success_list = save_det_to_fig(im_np, adv_np, LOSS, target_clean, all_models, im_id, im_idx, attack_goal, log_root, dataset, n_query)
+            dict_k_valid_id_v_success_list[im_id].append(success_list)
+
+            # save adv in folder
+            adv_path = adv_root / f"{im_id}.jpg"
+            adv_png = Image.fromarray(adv_np.astype(np.uint8))
+            adv_png.save(adv_path)
+
+            # stop whenever successful
+            if success_list[-1]:
+                dict_k_sucess_id_v_query[im_id] = n_query
+                print(f"success! image im idx: {im_idx}")
                 
-
-                ##################################### query minus #####################################
-                w_np_temp_minus = w_np.copy()
-                w_np_temp_minus[idx_w] -= lr_w * w_inv[idx_w]
-                adv_np_minus, LOSS_minus, patch = PM_tensor_weight_balancing_np(im_np, target, w_np_temp_minus, ensemble, eps, n_iters, alpha=alpha, dataset=dataset, adv_init=adv_np, patch=patch)
-                np.save(target_root/f"{im_id}_patch", patch)
-                loss_bb_minus, success_list = save_det_to_fig(im_np, adv_np_minus, LOSS_minus, target_clean, all_models, im_id, im_idx, attack_goal, log_root, dataset, n_query)
-
-                dict_k_valid_id_v_success_list[im_id].append(success_list)
+                w_list = []
+                loss_bb_list = [loss_bb]
+                loss_ens_list = LOSS['ens'] # ensemble losses during training
+            else:
 
                 n_query += 1
-                print(f"iter: {n_query}, {idx_w} -, loss_bb: {loss_bb_minus}")
 
-                # save adv in folder
-                adv_path = adv_root / f"{im_id}.jpg"
-                adv_png = Image.fromarray(adv_np_minus.astype(np.uint8))
-                adv_png.save(adv_path)
+                w_list = []        
+                loss_bb_list = [loss_bb]
+                loss_ens_list = LOSS['ens'] # ensemble losses during training
 
-                # stop whenever successful
-                if success_list[-1]:
-                    dict_k_sucess_id_v_query[im_id] = n_query
-                    print(f"success! image im idx: {im_idx}")
-                    loss_bb = loss_bb_minus
-                    loss_ens = LOSS_minus["ens"]
-                    w_np = w_np_temp_minus
-                    adv_np = adv_np_minus
-                    break
+                idx_w = 0 # idx of wb in W, rotate
+                while n_query < iterw:
 
-                #######################################################################################
+                    ##################################### query plus #####################################
+                    w_np_temp_plus = w_np.copy()
+                    w_np_temp_plus[idx_w] += lr_w * w_inv[idx_w]
+                    adv_np_plus, LOSS_plus, patch = PM_tensor_weight_balancing_np(im_np, target, w_np_temp_plus, ensemble, eps, n_iters, alpha=alpha, dataset=dataset, adv_init=adv_np, patch=patch)
+                    np.save(target_root/f"{im_id}_patch", patch)
+                    loss_bb_plus, success_list = save_det_to_fig(im_np, adv_np_plus, LOSS_plus, target_clean, all_models, im_id, im_idx, attack_goal, log_root, dataset, n_query)
 
+                    dict_k_valid_id_v_success_list[im_id].append(success_list)
 
-                ##################################### update w, adv #####################################
-                if loss_bb_plus < loss_bb_minus:
-                    loss_bb = loss_bb_plus
-                    loss_ens = LOSS_plus["ens"]
-                    w_np = w_np_temp_plus
-                    adv_np = adv_np_plus
-                else:
-                    loss_bb = loss_bb_minus
-                    loss_ens = LOSS_minus["ens"]
-                    w_np = w_np_temp_minus
-                    adv_np = adv_np_minus
+                    n_query += 1
+                    print(f"iter: {n_query}, {idx_w} +, loss_bb: {loss_bb_plus}")
 
-                # relu and normalize
-                w_np = np.maximum(0, w_np)
-                w_np = w_np + 0.005 # minimum set to 0.005
-                w_np = w_np / w_np.sum()
-                #######################################################################################
+                    # save adv in folder
+                    adv_path = adv_root / f"{im_id}.jpg"
+                    adv_png = Image.fromarray(adv_np_plus.astype(np.uint8))
+                    adv_png.save(adv_path)
+
+                    # stop whenever successful
+                    if success_list[-1]:
+                        dict_k_sucess_id_v_query[im_id] = n_query
+                        print(f"success! image im idx: {im_idx}")
+                        loss_bb = loss_bb_plus
+                        loss_ens = LOSS_plus["ens"]
+                        w_np = w_np_temp_plus
+                        adv_np = adv_np_plus
+                        break
+
+                    #######################################################################################
                     
-                idx_w = (idx_w+1)%n_wb
-                w_list.append(w_np.tolist())
-                loss_bb_list.append(loss_bb)
-                loss_ens_list += loss_ens
+
+                    ##################################### query minus #####################################
+                    w_np_temp_minus = w_np.copy()
+                    w_np_temp_minus[idx_w] -= lr_w * w_inv[idx_w]
+                    adv_np_minus, LOSS_minus, patch = PM_tensor_weight_balancing_np(im_np, target, w_np_temp_minus, ensemble, eps, n_iters, alpha=alpha, dataset=dataset, adv_init=adv_np, patch=patch)
+                    np.save(target_root/f"{im_id}_patch", patch)
+                    loss_bb_minus, success_list = save_det_to_fig(im_np, adv_np_minus, LOSS_minus, target_clean, all_models, im_id, im_idx, attack_goal, log_root, dataset, n_query)
+
+                    dict_k_valid_id_v_success_list[im_id].append(success_list)
+
+                    n_query += 1
+                    print(f"iter: {n_query}, {idx_w} -, loss_bb: {loss_bb_minus}")
+
+                    # save adv in folder
+                    adv_path = adv_root / f"{im_id}.jpg"
+                    adv_png = Image.fromarray(adv_np_minus.astype(np.uint8))
+                    adv_png.save(adv_path)
+
+                    # stop whenever successful
+                    if success_list[-1]:
+                        dict_k_sucess_id_v_query[im_id] = n_query
+                        print(f"success! image im idx: {im_idx}")
+                        loss_bb = loss_bb_minus
+                        loss_ens = LOSS_minus["ens"]
+                        w_np = w_np_temp_minus
+                        adv_np = adv_np_minus
+                        break
+
+                    #######################################################################################
+
+
+                    ##################################### update w, adv #####################################
+                    if loss_bb_plus < loss_bb_minus:
+                        loss_bb = loss_bb_plus
+                        loss_ens = LOSS_plus["ens"]
+                        w_np = w_np_temp_plus
+                        adv_np = adv_np_plus
+                    else:
+                        loss_bb = loss_bb_minus
+                        loss_ens = LOSS_minus["ens"]
+                        w_np = w_np_temp_minus
+                        adv_np = adv_np_minus
+
+                    # relu and normalize
+                    w_np = np.maximum(0, w_np)
+                    w_np = w_np + 0.005 # minimum set to 0.005
+                    w_np = w_np / w_np.sum()
+                    #######################################################################################
+                        
+                    idx_w = (idx_w+1)%n_wb
+                    w_list.append(w_np.tolist())
+                    loss_bb_list.append(loss_bb)
+                    loss_ens_list += loss_ens
 
 
 if __name__ == '__main__':
